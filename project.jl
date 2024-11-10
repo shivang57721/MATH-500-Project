@@ -407,7 +407,21 @@ From your experiments: Roughly at which residual norm is it advisable to switch 
 """
 
 # ╔═╡ e5bd8031-2c4a-4a62-b869-2ca4da4678ef
-# Your answer here
+let H = Htest(Double64), X=randn(eltype(H), size(H, 2), 2), Pinv= Double64.(inv(Float32.(H))), niter = 50
+	
+	#Float32
+	plot(last.(lobpcg(Float32.(H), X=Float32.(X), maxiter=niter, Pinv=Float32.(Pinv), tol=1e-25, verbose=false).residual_norms), yscale=:log10, label="Float32")
+	
+	#Float64
+	plot!(last.(lobpcg(Float64.(H), X=Float64.(X), maxiter=niter, Pinv=Float64.(Pinv), tol=1e-25, verbose=false).residual_norms), yscale=:log10, label="Float64")
+	
+	#Double64
+	plot!(last.(lobpcg(Double64.(H), X=Double64.(X), maxiter=niter, Pinv=Double64.(Pinv), tol=1e-25, verbose=false).residual_norms), yscale=:log10, label="Double64")
+
+	xlabel!("iteration number")
+	ylabel!("residual norm")
+	title!("residual norm evolution with different types")
+end
 
 # ╔═╡ f2956e16-2e09-4c4e-a663-b8c5acb7b089
 md"""
