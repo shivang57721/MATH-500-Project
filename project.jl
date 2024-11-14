@@ -169,8 +169,8 @@ md"""
 function plot_eigenfunctions(H, V, N, num)
 	x = 2π/N * (1:N)
 	evs = eigen(H(V, N))
-	plot(x, evs.vectors[:, 1], label=round(evs.values[1], digits=3))
-	for i in range(2, num)
+	plot()
+	for i in range(1, num)
 		plot!(x, evs.vectors[:, i], label=round(evs.values[i], digits=3))
 	end
 	if H(V, N)[1, end] != 0
@@ -181,13 +181,10 @@ function plot_eigenfunctions(H, V, N, num)
 end
 
 # ╔═╡ 099a4340-bb0b-4eef-a630-ea94fba4d70c
-begin
-	V(x) = cos(x)
-	plot_eigenfunctions(fd_hamiltonian_periodic, V, 1000, 4)
-end
+plot_eigenfunctions(fd_hamiltonian_periodic, cos, 1000, 4)
 
 # ╔═╡ 9dd3d49a-ac5a-472e-aec6-d758ab604e08
-plot_eigenfunctions(fd_hamiltonian_dirichlet, V, 1000, 4)
+plot_eigenfunctions(fd_hamiltonian_dirichlet, cos, 1000, 4)
 
 # ╔═╡ cb07dfa3-5151-4993-a8b4-62190ccace02
 md"""
@@ -198,21 +195,31 @@ md"""
 
 
 # ╔═╡ f32f840c-c8f4-437a-8ac9-5b6cba2abb34
-begin
-	eigenvalues_approx = zeros(100, 4)
-	for (i, N) in enumerate(range(5, 104, 100))
-		evs = eigen(fd_hamiltonian_periodic(V, Int(N)))
-		eigenvalues_approx[i, :] = evs.values[1:4]
+function plot_convergence_with_N(H, V)
+	error = zeros(50, 4)
+	eigenvalues_exact = eigen(H(V, 5000)).values[1:4]
+	test_N = range(100, 5000, 50)
+	for (i, N) in enumerate(test_N)
+		error[i, :] = abs.(eigenvalues_exact - eigen(H(V, Int(floor(N)))).values[1:4])
 	end
-	plot(range(5, 104, 100), eigenvalues_approx[:, 1], label="1")
-	for i in range(2, 4)
-		plot!(range(5, 104, 100), eigenvalues_approx[:, i], label=string(i))
+	plot(yaxis=:log, xlims=(0, 5000), ylims=(1e-8, 1))
+	for i in range(1, 4)
+		plot!(test_N, error[:, i], label=string(i))
 	end
 	xlabel!("N")
-	ylabel!("Eigenvalue")
-	title!("Convergence of Eigenvalues with N")
+	if H(V, 10)[1, end] != 0
+		title!("Convergence of Eigenvalues (Periodic boundary)")
+	else
+		title!("Convergence of Eigenvalues (Dirichlet boundary)")
+	end
 end
 	
+
+# ╔═╡ 86693da0-9b06-4c13-9d73-55ee364de1d8
+plot_convergence_with_N(fd_hamiltonian_dirichlet, cos)
+
+# ╔═╡ 0a6c99c7-11c8-46f4-8ec2-6fb2166579f7
+plot_convergence_with_N(fd_hamiltonian_periodic, cos)
 
 # ╔═╡ 3d5e051f-13a9-415e-80bd-78cafc16b97a
 md"""
@@ -3391,6 +3398,8 @@ version = "1.4.1+1"
 # ╠═9dd3d49a-ac5a-472e-aec6-d758ab604e08
 # ╟─cb07dfa3-5151-4993-a8b4-62190ccace02
 # ╠═f32f840c-c8f4-437a-8ac9-5b6cba2abb34
+# ╠═86693da0-9b06-4c13-9d73-55ee364de1d8
+# ╠═0a6c99c7-11c8-46f4-8ec2-6fb2166579f7
 # ╟─3d5e051f-13a9-415e-80bd-78cafc16b97a
 # ╠═da1c7f17-aaf8-464a-b7b5-8ce2f2c5a1c4
 # ╟─eab701f2-b43e-4805-8a78-ee62dde5fc15
