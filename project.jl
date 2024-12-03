@@ -16,6 +16,7 @@ begin
 	using LinearMaps
 	using DoubleFloats
 	using Brillouin
+	using Interpolations
 end
 
 # ╔═╡ 4b7ade30-8c59-11ee-188d-c3d4588f7106
@@ -165,13 +166,23 @@ md"""
 **(c)** We now turn our attention to the case $V(x) = \cos(x)$ for the rest of part 1. Using your functions above, compute again the lowest four eigenpairs for both boundary conditions. Plot in each case the corresponding eigenfunctions. What do you notice ?
 """
 
+# ╔═╡ 915c79fc-5d79-4d61-acac-5e4b9618814d
+function standardize_eigenvectors(eigenvectors, tol=-1e-6)
+    for i in 1:size(eigenvectors, 2)
+        if eigenvectors[1, i] < tol
+            eigenvectors[:, i] .= -eigenvectors[:, i]
+        end
+    end
+    return eigenvectors
+end
+
 # ╔═╡ cfdbc7d7-21dd-4639-9a55-f9aa11ce746e
 function plot_eigenfunctions(H, V, N, num)
-	x = 2π/N * (1:N)
+	x = range(0, stop=2π, length=N)
 	evs = eigen(H(V, N))
 	plot()
 	for i in range(1, num)
-		plot!(x, evs.vectors[:, i], label=round(evs.values[i], digits=3))
+		plot!(x, standardize_eigenvectors(evs.vectors[:, i]), label=round(evs.values[i], sigdigits=3))
 	end
 	if H(V, N)[1, end] != 0
 		title!("Plot of Eigenfunctions (Periodic boundary)")
@@ -194,32 +205,75 @@ md"""
 """
 
 
+# ╔═╡ 5432afd8-3e00-4756-ab89-d0315625330d
+begin
+	# Caclulate Exact Eigenspectrum (N=5000)
+	eigenspectrum_exact_dir = eigen(fd_hamiltonian_dirichlet(cos, 5000))
+	eigenspectrum_exact_per = eigen(fd_hamiltonian_periodic(cos, 5000))
+end
+
+# ╔═╡ 6903d208-e9df-4a3e-b938-95ebee57ea90
+function interpolate_function(f, N=5000)
+	x = range(2π/length(f), stop=2π, length=length(f))
+	itp = cubic_spline_interpolation(x, f, extrapolation_bc=Line())
+	x_fine = range(2π/N, stop=2π, length=N)
+	fine_values = itp.(x_fine)
+	return fine_values
+end
+
 # ╔═╡ f32f840c-c8f4-437a-8ac9-5b6cba2abb34
-function plot_convergence_with_N(H, V)
-	error = zeros(50, 4)
-	eigenvalues_exact = eigen(H(V, 5000)).values[1:4]
-	test_N = range(100, 5000, 50)
+function plot_convergence_with_N(model, eigenspectrum, num_N=100, num_evs=4)
+	V = cos
+	if model == "periodic"
+		H = fd_hamiltonian_periodic
+	elseif model == "dirichlet"
+		H = fd_hamiltonian_dirichlet
+	end
+	
+	error_eigenvalues = zeros(num_N, num_evs)
+	error_eigenvectors = zeros(num_N, num_evs)
+	eigenvalues_exact = eigenspectrum.values[1:num_evs]
+	eigenvectors_exact = standardize_eigenvectors(eigenspectrum.vectors)
+	test_N = range(10, 500, num_N)
+	
 	for (i, N) in enumerate(test_N)
-		error[i, :] = abs.(eigenvalues_exact - eigen(H(V, Int(floor(N)))).values[1:4])
+		eigenspectrum_N = eigen(H(V, Int(floor(N))))
+		error_eigenvalues[i, :] = abs.(eigenvalues_exact - eigenspectrum_N.values[1:num_evs])
+		
+		eigenvectors_N = standardize_eigenvectors(eigenspectrum_N.vectors)
+		for j in 1:num_evs
+			f_interpolated = interpolate_function(eigenvectors_N[:, j])
+			f_exact = eigenvectors_exact[:, j]
+			error_eigenvectors[i,j] = norm(f_exact - f_interpolated) * (2π / N)^(0.5)
+		end
 	end
-	plot(yaxis=:log, xlims=(0, 5000), ylims=(1e-8, 1))
-	for i in range(1, 4)
-		plot!(test_N, error[:, i], label=string(i))
+
+	# Make layout and set up plots
+	layout = @layout [a; b]
+	plot(size=(800, 1000), layout=layout)
+
+	# Add the first subplot
+	plot!(yaxis=:log, subplot=1, label="Plot 1")
+	
+	# Add the second subplot
+	plot!(yaxis=:log, subplot=2, label="Plot 2")
+	
+	for i in range(1, num_evs)
+		plot!(test_N, error_eigenvalues[:, i], label="Eigenvalue #$i", subplot=1)
+		plot!(test_N, error_eigenvectors[:, i], label="Eigenvector #$i", subplot=2)
 	end
+
 	xlabel!("N")
-	if H(V, 10)[1, end] != 0
-		title!("Convergence of Eigenvalues (Periodic boundary)")
-	else
-		title!("Convergence of Eigenvalues (Dirichlet boundary)")
-	end
+	title!("Convergence of Eigenvalues ($model boundary)", subplot=1)
+	title!("Convergence of Eigenvectors ($model boundary)", subplot=2)
 end
 	
 
 # ╔═╡ 86693da0-9b06-4c13-9d73-55ee364de1d8
-plot_convergence_with_N(fd_hamiltonian_dirichlet, cos)
+plot_convergence_with_N("dirichlet", eigenspectrum_exact_dir)
 
 # ╔═╡ 0a6c99c7-11c8-46f4-8ec2-6fb2166579f7
-plot_convergence_with_N(fd_hamiltonian_periodic, cos)
+plot_convergence_with_N("periodic", eigenspectrum_exact_per)
 
 # ╔═╡ 3d5e051f-13a9-415e-80bd-78cafc16b97a
 md"""
@@ -233,7 +287,73 @@ How accurate is your perturbation-based approach compared to computing the actua
 """
 
 # ╔═╡ da1c7f17-aaf8-464a-b7b5-8ce2f2c5a1c4
-# Your answer here
+function get_approx_dir_per_eigen(N, num_evs=3)
+	# Assume we know eigenspectrum of H_dir
+	H_dir = fd_hamiltonian_dirichlet(cos, N)
+	eigenspectrum = eigen(H_dir)
+	ΔA = zeros(N, N)
+	ΔA[1, end] = -1 / 2(2π / N)^2
+	ΔA[end, 1] = -1 / 2(2π / N)^2
+
+	x_approx = zeros(N, num_evs)
+	λ_approx = zeros(num_evs)
+	for i in 1:num_evs
+		λ_dir = eigenspectrum.values[i]
+		x_dir = standardize_eigenvectors(eigenspectrum.vectors)[:, i]
+		
+		Δλ = dot(x_dir, ΔA * x_dir)
+	
+		Q_λ = I - x_dir * x_dir' 
+		Δx = - (H_dir - λ_dir * I) \ (Q_λ * ΔA * x_dir)
+	
+		x_per = x_dir + Δx
+		λ_per = λ_dir + Δλ
+
+		x_approx[:, i] = x_per
+		λ_approx[i] = λ_per
+	end
+
+	λ_dirichlet = eigenspectrum.values[1:num_evs]
+	x_dirichlet = standardize_eigenvectors(eigenspectrum.vectors)[:, 1:num_evs]
+
+	H_per = fd_hamiltonian_periodic(cos, N)
+	eigenspectrum = eigen(H_per)
+	λ_periodic = eigenspectrum.values[1:num_evs]
+	x_periodic = standardize_eigenvectors(eigenspectrum.vectors)[:, 1:num_evs]
+	
+	return (λ_approx, x_approx, λ_dirichlet, x_dirichlet, λ_periodic, x_periodic)
+end
+
+# ╔═╡ d870beac-018e-44c6-8356-8ba4e337c2cd
+begin
+	max_N = 500
+	num_evs = 3
+	test_N = 5:20:max_N
+	errors_eigenvector = zeros(length(test_N), num_evs)
+	errors_eigenvalue = zeros(length(test_N), num_evs)
+	for (i,N) in enumerate(test_N)
+		λ_approx, x_approx, λ_dirichlet, x_dirichlet, λ_periodic, x_periodic = get_approx_dir_per_eigen(N, num_evs)
+		errors_eigenvector[i,:] = mapslices(norm, x_approx - x_periodic, dims=1) * (2π / N)^(0.5)
+		errors_eigenvalue[i, :] = abs.(λ_approx - λ_periodic)
+	end
+
+	# Make layout and set up plots
+	layout = @layout [a; b]
+	plot(size=(800, 1000), layout=layout)
+
+	# Add the first subplot
+	plot!(yaxis=:log, subplot=1, label="Plot 1")
+	
+	# Add the second subplot
+	plot!(yaxis=:log, subplot=2, label="Plot 2")
+	
+	plot!(test_N, errors_eigenvector, label=["Eigenvector #1" "Eigenvector #2" "Eigenvector #3"], subplot=1)
+
+	plot!(test_N, errors_eigenvalue, label=["Eigenvalue #1" "Eigenvalue #2" "Eigenvalue #3"], subplot=2)
+	
+	title!("Error in percolation theory approx eigenvector", subplot=1)
+	title!("Error in percolation theory approx eigenvalue", subplot=2)
+end
 
 # ╔═╡ eab701f2-b43e-4805-8a78-ee62dde5fc15
 md"""
@@ -1394,6 +1514,7 @@ BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Brillouin = "23470ee3-d0df-4052-8b1a-8cbd6363e7f0"
 DFTK = "acf6eb54-70d9-11e9-0013-234b7a5f5337"
 DoubleFloats = "497a8b3b-efae-58df-a0af-a86822472b78"
+Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearMaps = "7a12625a-238d-50fd-b39a-03d52299707e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
@@ -1406,6 +1527,7 @@ BenchmarkTools = "~1.5.0"
 Brillouin = "~0.5.19"
 DFTK = "~0.6.20"
 DoubleFloats = "~1.4.0"
+Interpolations = "~0.15.1"
 LinearMaps = "~3.11.3"
 Plots = "~1.40.5"
 PlutoTeachingTools = "~0.3.1"
@@ -1418,7 +1540,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.1"
 manifest_format = "2.0"
-project_hash = "48f184f322f8e330f5f40ed1e58c03d92c3ffeb9"
+project_hash = "2759adee6acfe44024a8dc41e46da37b938091f5"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -3393,15 +3515,19 @@ version = "1.4.1+1"
 # ╟─347744bb-8670-4d67-855d-982ae6c35f86
 # ╠═27df213e-7e3e-4d25-880b-d0cce3563c04
 # ╟─50cc1f78-4de0-48f4-876a-d30b4ef3d8d0
+# ╠═915c79fc-5d79-4d61-acac-5e4b9618814d
 # ╠═cfdbc7d7-21dd-4639-9a55-f9aa11ce746e
 # ╠═099a4340-bb0b-4eef-a630-ea94fba4d70c
 # ╠═9dd3d49a-ac5a-472e-aec6-d758ab604e08
 # ╟─cb07dfa3-5151-4993-a8b4-62190ccace02
+# ╠═5432afd8-3e00-4756-ab89-d0315625330d
+# ╠═6903d208-e9df-4a3e-b938-95ebee57ea90
 # ╠═f32f840c-c8f4-437a-8ac9-5b6cba2abb34
 # ╠═86693da0-9b06-4c13-9d73-55ee364de1d8
 # ╠═0a6c99c7-11c8-46f4-8ec2-6fb2166579f7
 # ╟─3d5e051f-13a9-415e-80bd-78cafc16b97a
 # ╠═da1c7f17-aaf8-464a-b7b5-8ce2f2c5a1c4
+# ╠═d870beac-018e-44c6-8356-8ba4e337c2cd
 # ╟─eab701f2-b43e-4805-8a78-ee62dde5fc15
 # ╠═d32943b3-d098-4b9b-bab0-5b1871d9d5ac
 # ╟─58e69281-e2d7-40d9-9c1e-4b6807b405b7
