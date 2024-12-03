@@ -306,7 +306,7 @@ How accurate is your perturbation-based approach compared to computing the actua
 function get_approx_dir_per_eigen(N, num_evs=3)
 	# Assume we know eigenspectrum of H_dir
 	H_dir = fd_hamiltonian_dirichlet(cos, N)
-	eigenspectrum = eigen(H_dir)
+	eigenspectrum_H_dir = eigen(H_dir)
 	ΔA = zeros(N, N)
 	ΔA[1, end] = -1 / 2(2π / N)^2
 	ΔA[end, 1] = -1 / 2(2π / N)^2
@@ -314,8 +314,8 @@ function get_approx_dir_per_eigen(N, num_evs=3)
 	x_approx = zeros(N, num_evs)
 	λ_approx = zeros(num_evs)
 	for i in 1:num_evs
-		λ_dir = eigenspectrum.values[i]
-		x_dir = standardize_eigenvectors(eigenspectrum.vectors)[:, i]
+		λ_dir = eigenspectrum_H_dir.values[i]
+		x_dir = standardize_eigenvectors(eigenspectrum_H_dir.vectors)[:, i]
 		
 		Δλ = dot(x_dir, ΔA * x_dir)
 	
@@ -329,13 +329,13 @@ function get_approx_dir_per_eigen(N, num_evs=3)
 		λ_approx[i] = λ_per
 	end
 
-	λ_dirichlet = eigenspectrum.values[1:num_evs]
-	x_dirichlet = standardize_eigenvectors(eigenspectrum.vectors)[:, 1:num_evs]
+	λ_dirichlet = eigenspectrum_H_dir.values[1:num_evs]
+	x_dirichlet = standardize_eigenvectors(eigenspectrum_H_dir.vectors)[:, 1:num_evs]
 
 	H_per = fd_hamiltonian_periodic(cos, N)
-	eigenspectrum = eigen(H_per)
-	λ_periodic = eigenspectrum.values[1:num_evs]
-	x_periodic = standardize_eigenvectors(eigenspectrum.vectors)[:, 1:num_evs]
+	eigenspectrum_H_per = eigen(H_per)
+	λ_periodic = eigenspectrum_H_per.values[1:num_evs]
+	x_periodic = standardize_eigenvectors(eigenspectrum_H_per.vectors)[:, 1:num_evs]
 	
 	return (λ_approx, x_approx, λ_dirichlet, x_dirichlet, λ_periodic, x_periodic)
 end
@@ -367,8 +367,8 @@ begin
 
 	plot!(test_N, errors_eigenvalue, label=["Eigenvalue #1" "Eigenvalue #2" "Eigenvalue #3"], subplot=2)
 	
-	title!("Error in percolation theory approx eigenvector", subplot=1)
-	title!("Error in percolation theory approx eigenvalue", subplot=2)
+	title!("Error in pertubation theory approx eigenvector", subplot=1)
+	title!("Error in pertubation theory approx eigenvalue", subplot=2)
 end
 
 # ╔═╡ eab701f2-b43e-4805-8a78-ee62dde5fc15
@@ -380,6 +380,9 @@ Demonstrate the accuracy of your bounds across increasing values for $N$.
 
 At which discretisation parameter $N$ is your estimated model error (from using $\textbf{H}_\text{dir}$ instead of $\textbf{H}_\text{per}$) roughly on the same order as the discretisation error for each of the first three eigenvalues ?
 """
+
+# ╔═╡ 61388f5c-46ad-4cea-b93a-87f7185ef304
+
 
 # ╔═╡ d32943b3-d098-4b9b-bab0-5b1871d9d5ac
 # Your answer here
@@ -3771,6 +3774,7 @@ version = "1.4.1+1"
 # ╠═da1c7f17-aaf8-464a-b7b5-8ce2f2c5a1c4
 # ╠═d870beac-018e-44c6-8356-8ba4e337c2cd
 # ╟─eab701f2-b43e-4805-8a78-ee62dde5fc15
+# ╠═61388f5c-46ad-4cea-b93a-87f7185ef304
 # ╠═d32943b3-d098-4b9b-bab0-5b1871d9d5ac
 # ╟─58e69281-e2d7-40d9-9c1e-4b6807b405b7
 # ╟─cd99bdc8-dabf-4ddc-82a7-e79cd0f2e52b
