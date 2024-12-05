@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.3
+# v0.19.46
 
 using Markdown
 using InteractiveUtils
@@ -17,6 +17,17 @@ begin
 	using DoubleFloats
 	using Brillouin
 	using Interpolations
+end
+
+# ╔═╡ 254bfb5d-8b0b-4cba-8bc4-c32c0312f690
+#https://docs.sciml.ai/LinearSolve/stable/basics/Preconditioners/
+begin
+	using LimitedLDLFactorizations
+end
+
+# ╔═╡ 57dcd7d6-edd4-4c02-a3fd-dd74aeb5598a
+begin
+	using Preconditioners
 end
 
 # ╔═╡ 4b7ade30-8c59-11ee-188d-c3d4588f7106
@@ -405,7 +416,64 @@ What is the advantage of the finite-difference Dirichlet Hamiltonian $\textbf{H}
 """
 
 # ╔═╡ 89dc90a0-6c2c-4076-86b2-7ed79eccc988
-# Your answer here
+#H_per\x , N = 500
+let
+	H = fd_hamiltonian_periodic(cos, 500);
+	x = randn(size(H, 2));
+	@btime $H \ $x
+end
+
+# ╔═╡ 8a5692e8-ebf4-4521-9d23-aff2bb0c4921
+#factorized(H_per)\x , N = 500
+let
+	H = fd_hamiltonian_periodic(cos, 500);
+	H = factorize(H);
+	x = randn(size(H, 2));
+	@btime $H \ $x
+end
+
+# ╔═╡ b68f0dce-89a4-4a9c-8f2e-4611895063df
+#H_dir*x , N = 500
+let
+	H = fd_hamiltonian_dirichlet(cos, 500);
+	x = randn(size(H, 2));
+	@btime $H * $x
+end
+
+# ╔═╡ 03f6cbbf-f68f-40ed-9580-984ffa36f4e2
+#H_dir\x , N = 500
+let
+	H = fd_hamiltonian_dirichlet(cos, 500);
+	x = randn(size(H, 2));
+	@btime $H \ $x
+end
+
+# ╔═╡ e4a34755-7a66-4bf8-bc90-7751188c7300
+#factorized(H_dir)\x , N = 500
+let
+	H = fd_hamiltonian_dirichlet(cos, 500);
+	H = factorize(H);
+	x = randn(size(H, 2));
+	@btime $H \ $x
+end
+
+# ╔═╡ ba2590e6-c9f6-46ff-84e0-20ecef148338
+#factorized(H_dir)\x , N = 1000
+let
+	H = fd_hamiltonian_dirichlet(cos, 1000);
+	H = factorize(H);
+	x = randn(size(H, 2));
+	@btime $H \ $x
+end
+
+# ╔═╡ 9127d505-3d0b-4ad0-b08e-ce441a74991e
+#factorized(H_dir)\x , N = 4000
+let
+	H = fd_hamiltonian_dirichlet(cos, 4000);
+	H = factorize(H);
+	x = randn(size(H, 2));
+	@btime $H \ $x
+end
 
 # ╔═╡ 772542e0-4676-46dc-827b-51dbeaa7f942
 md"---"
@@ -496,8 +564,31 @@ md"""
 - Look up how the `InverseMap` works.
 """
 
-# ╔═╡ 254bfb5d-8b0b-4cba-8bc4-c32c0312f690
-# Your answer here
+# ╔═╡ 7270fb1f-12eb-4a1a-a578-e3fc068cf698
+#https://discourse.julialang.org/t/ldlt-factorization-for-full-matrices/75356
+#https://docs.sciml.ai/LinearSolve/stable/basics/Preconditioners/
+let
+	Xinit = randn(500, 3)
+	H = fd_hamiltonian_periodic(cos, 500);
+	P1 = I #Identity Preconditioner
+	P2 = Diagonal(1 ./ diag(H)) # Diagonal (Jacobi) Pinv=Diagonal(1 ./ diag(Apgd))
+	#P3 = CholeskyPreconditioner(H, 2) #Not working
+	#P4 = AMGPreconditioner{RugeStuben}(H) #Not working
+	#P5 = AMGPreconditioner{SmoothedAggregation}(H) #Not working
+	P6 = abs.(inv(lu(H).L)) #LUL Preconditioner (L)
+	P7 = abs.(inv(lu(H).U)) #LUL Preconditioner (U)
+	P8 = InverseMap(factorize(H)) #InverseMap Preconditioner
+	print("Identity Preconditioner: \n")
+	lobpcg(H; Pinv=P1, X=Xinit, tol=1e-6)
+	print("Jacobi Preconditioner: \n ")
+	lobpcg(H; Pinv=P2, X=Xinit, tol=1e-6)
+	print("L Preconditioner: \n ")
+	lobpcg(H; Pinv=P6, X=Xinit, tol=1e-6)
+	print("U Preconditioner: \n ")
+	lobpcg(H; Pinv=P7, X=Xinit, tol=1e-6)
+	print("InverseMap Preconditioner: \n ")
+	lobpcg(H; Pinv=P8, X=Xinit, tol=1e-6)
+end
 
 # ╔═╡ 00720b56-b681-4ff2-bc42-4d19318c7f74
 md"""
@@ -510,7 +601,44 @@ res = @btime lobpcg($Hper; Pinv=$Pinv, X=$Xinit, tol=1e-6, verbose=false)
 """
 
 # ╔═╡ 02ce43cd-9c83-4113-b326-852cf82c1751
-# Your answer here
+#Check the time per iteration
+let
+	Xinit = randn(500, 3)
+	Hper = fd_hamiltonian_periodic(cos, 500);
+	P1 = I 
+	P2 = Diagonal(1 ./ diag(Hper))
+	P8 = InverseMap(factorize(Hper))
+	print("Identity Preconditioner\n")
+	res1 = @btime lobpcg($Hper; Pinv=$P1, X=$Xinit, tol=1e-6, maxiter=2000, verbose=false)
+	print("Number of iterations:$(size(res1.eigenvalues,1))\n")
+
+	print("Diagonal Preconditioner\n")
+	res2 = @btime lobpcg($Hper; Pinv=$P2, X=$Xinit, tol=1e-6, maxiter=2000, verbose=false)
+	print("Number of iterations:$(size(res2.eigenvalues,1))\n")
+	
+	print("InverseMap Preconditioner\n")
+	res3 = @btime lobpcg($Hper; Pinv=$P8, X=$Xinit, tol=1e-6, maxiter=2000, verbose=false)
+	print("Number of iterations:$(size(res3.eigenvalues,1))\n")
+end
+
+# ╔═╡ 3652b972-275c-424f-bee1-9f54b7ccd898
+let
+	Xinit = randn(2000, 3)
+	Hper = fd_hamiltonian_periodic(cos, 2000);
+	P8 = InverseMap(factorize(Hper))
+	print("InverseMap Preconditioner\n")
+	res3 = @btime lobpcg($Hper; Pinv=$P8, X=$Xinit, tol=1e-6, maxiter=2000, verbose=false)
+	print("Number of iterations:$(size(res3.eigenvalues,1))\n")
+end
+
+# ╔═╡ a7eaade6-323d-4373-96e3-34dc81b3803e
+md"""
+### Results of Task 1.2
+The Dirichlet Hamiltonian has a shorter computing time compared to the Periodic Hamiltonian.
+Increasing the number of N can increase the computation time.
+Using '\' instead of inv() can decrease the runtime.
+Among all the preconditioners, the InverseMap has the best performance with the lowest total run time and the number of iterations; however, this preconditioner is costly and the time per iteration is longer than the identity or diagonal preconditioner and the lower iteration to reach the answer makes this preconditioner a great candidate with lowest total time.
+"""
 
 # ╔═╡ e5af416d-20a9-4812-99ff-45d62d6ab3a6
 md"-----------------"
@@ -962,7 +1090,53 @@ md"""
 """
 
 # ╔═╡ 56108a52-61ed-43fc-bd0d-7fc4221f05ce
-# Your answer here
+function calculate_eigenvalues(model, Ecut)
+    basis = PlaneWaveBasis(model; Ecut=Ecut, kgrid=(1, 1, 1))
+    ham = Hamiltonian(basis)
+    eigres = diagonalize_auto(ham, 2)
+    return eigres.eigenvalues
+end
+
+# ╔═╡ 580e4dc0-b4dd-4f63-9db7-7fdebf225f1c
+begin
+	# Define a range of Ecut values to test
+	Ecut_values = 5:0.5:30
+end
+
+# ╔═╡ bfcf40d8-3855-454b-843b-fe3bdd1e5a92
+begin
+	# Initialize a matrix to store the results
+	eigenvalues = zeros(length(Ecut_values), 2)
+end
+
+# ╔═╡ 20c15f08-8bf9-4c6b-84ab-4486ba0a9237
+# Loop over Ecut values and calculate eigenvalues
+for (i, Ecut) in enumerate(Ecut_values)
+    eigenvalues[i, :] = calculate_eigenvalues(model, Ecut)[1]
+end
+
+# ╔═╡ e0c6e8d3-4f0a-4be6-805f-79fb012c01d8
+begin
+	# Plot the results
+	plot(Ecut_values, eigenvalues[:, 1], label="First Eigenvalue")
+	#plot!(Ecut_values, eigenvalues[:, 2], label="Second Eigenvalue")
+	xlabel!("Ecut")
+	ylabel!("Eigenvalue")
+	title!("Eigenvalues vs. Ecut")
+end
+
+# ╔═╡ 0e0ed0c6-ab11-4d4e-9552-3c89f7bd1392
+begin
+	# Plot the results
+	#plot(Ecut_values, eigenvalues[:, 1], label="First Eigenvalue")
+	plot(Ecut_values, eigenvalues[:, 2], label="Second Eigenvalue")
+	xlabel!("Ecut")
+	ylabel!("Eigenvalue")
+	title!("Eigenvalues vs. Ecut")
+end
+
+# ╔═╡ 5daa306b-0dfe-4d4b-9e03-1ed7b50d6c61
+calculate_eigenvalues(model, 80)[1]
 
 # ╔═╡ ba1ba08f-7fe5-4fb3-b736-adaf7200af08
 md"""-------------"""
@@ -3603,6 +3777,12 @@ version = "1.4.1+1"
 # ╠═6002d1e6-57b6-4284-a773-409308e4b58f
 # ╟─f7343721-e40b-437d-871e-b7b52201d861
 # ╠═89dc90a0-6c2c-4076-86b2-7ed79eccc988
+# ╠═8a5692e8-ebf4-4521-9d23-aff2bb0c4921
+# ╠═b68f0dce-89a4-4a9c-8f2e-4611895063df
+# ╠═03f6cbbf-f68f-40ed-9580-984ffa36f4e2
+# ╠═e4a34755-7a66-4bf8-bc90-7751188c7300
+# ╠═ba2590e6-c9f6-46ff-84e0-20ecef148338
+# ╠═9127d505-3d0b-4ad0-b08e-ce441a74991e
 # ╟─772542e0-4676-46dc-827b-51dbeaa7f942
 # ╟─ff257f67-2571-408a-88de-6afe220d2a67
 # ╠═727cb564-bf00-431a-a4d8-26d5fa2beddc
@@ -3613,8 +3793,12 @@ version = "1.4.1+1"
 # ╠═c9cc14a6-4054-4fde-8b7e-abc0f4f8ffa4
 # ╟─bb62070f-4277-4ab5-9a8c-1f865c07aeab
 # ╠═254bfb5d-8b0b-4cba-8bc4-c32c0312f690
+# ╠═57dcd7d6-edd4-4c02-a3fd-dd74aeb5598a
+# ╠═7270fb1f-12eb-4a1a-a578-e3fc068cf698
 # ╟─00720b56-b681-4ff2-bc42-4d19318c7f74
 # ╠═02ce43cd-9c83-4113-b326-852cf82c1751
+# ╠═3652b972-275c-424f-bee1-9f54b7ccd898
+# ╠═a7eaade6-323d-4373-96e3-34dc81b3803e
 # ╟─e5af416d-20a9-4812-99ff-45d62d6ab3a6
 # ╟─66758cad-6aa8-496c-b2a6-3b1ca7c1fe42
 # ╠═d6930f90-2ded-4491-be63-582bfdb3b8d8
@@ -3658,6 +3842,12 @@ version = "1.4.1+1"
 # ╠═601c837c-1615-4826-938c-b39bb35f46d1
 # ╟─e0a07aca-f81a-436b-b11e-8446120e0235
 # ╠═56108a52-61ed-43fc-bd0d-7fc4221f05ce
+# ╠═580e4dc0-b4dd-4f63-9db7-7fdebf225f1c
+# ╠═bfcf40d8-3855-454b-843b-fe3bdd1e5a92
+# ╠═20c15f08-8bf9-4c6b-84ab-4486ba0a9237
+# ╠═e0c6e8d3-4f0a-4be6-805f-79fb012c01d8
+# ╠═0e0ed0c6-ab11-4d4e-9552-3c89f7bd1392
+# ╠═5daa306b-0dfe-4d4b-9e03-1ed7b50d6c61
 # ╟─ba1ba08f-7fe5-4fb3-b736-adaf7200af08
 # ╟─58856ccd-3a1c-4a5f-9bd2-159be331f07c
 # ╟─e04087db-9973-4fad-a964-20d109fff335
