@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.46
+# v0.20.0
 
 using Markdown
 using InteractiveUtils
@@ -41,11 +41,6 @@ md"""
 
 # ╔═╡ f09f563c-e458-480f-92be-355ab4582fb5
 TableOfContents()
-
-# ╔═╡ 3de7dfe4-032b-4e05-a929-5ffabfbb35cc
-md"""
-Hi my name is Bardia
-"""
 
 # ╔═╡ c17073d6-94e2-464f-acff-6f444bf7d08c
 md"""
@@ -669,70 +664,8 @@ In each run use the *the same* initial guess for each floating-point precision `
 From your experiments: Roughly at which residual norm is it advisable to switch from one precision to the other in order to avoid impacting the rate of convergence ?
 """
 
-# ╔═╡ 376a8e8e-c0be-413f-8035-dea8cd14f752
-function lobpcg_new(A; X=randn(eltype(A), size(A, 2), 2), ortho=ortho_cholesky,
-                Pinv=I, tol=1e-6, maxiter=100, verbose=true)
-	T = real(eltype(A))
-	T_pinv = eltype(Pinv)
-	m = size(X, 2)  # block size
-
-	eigenvalues    = Vector{T}[]
-	residual_norms = Vector{T}[]
-	λ = NaN
-	P = nothing
-	R = nothing
-	
-	for i in 1:maxiter	
-		if i > 1
-			Z = hcat(X, P, R)
-		else
-			Z = X
-		end
-		Z = ortho(Z)
-		AZ = A * Z
-		λ, Y = eigen(Hermitian(Z' * AZ))
-		λ = λ[1:m]
-		Y = Y[:, 1:m]
-		new_X = Z * Y
-
-		R = AZ * Y - new_X * Diagonal(λ)
-		norm_r = norm.(eachcol(R))
-		push!(eigenvalues, λ)
-		push!(residual_norms, norm_r)
-		verbose && @printf "%3i %8.4g %8.4g\n" i λ[end] norm_r[end]
-		if maximum(norm_r) < tol
-			X = new_X
-			break
-		end
-
-		R = T_pinv.(R)
-		R = Matrix(Pinv * R)
-		P = X - new_X
-		X = new_X
-	end
-
-	(; λ, X, eigenvalues, residual_norms)
-end
-
 # ╔═╡ e5bd8031-2c4a-4a62-b869-2ca4da4678ef
-let H = Htest(Double64), X=randn(eltype(H), size(H, 2), 3), Pinv=InverseMap(factorize(Float32.(H))), niter = 50;
-	
-	#Float32
-	result32=last.(lobpcg_new(Float32.(H), X=Float32.(X), maxiter=niter, Pinv=Pinv, tol=1e-25, verbose=false).residual_norms)
-	plot(result32, yscale=:log10, label="Float32")
-	
-	#Float64
-	result64=last.(lobpcg_new(Float64.(H), X=Float64.(X), maxiter=niter, Pinv=Pinv, tol=1e-25, verbose=false).residual_norms)
-	plot!(result64, yscale=:log10, label="Float64")
-	
-	#Double64
-	resultD64=last.(lobpcg_new(Double64.(H), X=Double64.(X), maxiter=niter, Pinv=Pinv, tol=1e-25, verbose=false).residual_norms)
-	plot!(resultD64, yscale=:log10, label="Double64")
-
-	xlabel!("iteration number")
-	ylabel!("residual norm")
-	title!("residual norm evolution with different types")
-end
+# Your answer here
 
 # ╔═╡ f2956e16-2e09-4c4e-a663-b8c5acb7b089
 md"""
@@ -3748,7 +3681,6 @@ version = "1.4.1+1"
 # ╟─35066ab2-d52d-4a7f-9170-abbae6216996
 # ╠═a9548adc-cc71-4f26-96d2-7aefc39a554f
 # ╟─f09f563c-e458-480f-92be-355ab4582fb5
-# ╠═3de7dfe4-032b-4e05-a929-5ffabfbb35cc
 # ╟─c17073d6-94e2-464f-acff-6f444bf7d08c
 # ╟─a4f9260b-7016-4a12-8fd1-230b8e234496
 # ╟─1bfb62aa-4b01-4839-8073-2a196162cd17
@@ -3807,8 +3739,7 @@ version = "1.4.1+1"
 # ╟─66758cad-6aa8-496c-b2a6-3b1ca7c1fe42
 # ╠═d6930f90-2ded-4491-be63-582bfdb3b8d8
 # ╟─23afdfdd-885d-4aaa-baa0-78948b8fca48
-# ╠═376a8e8e-c0be-413f-8035-dea8cd14f752
-# ╠═e5bd8031-2c4a-4a62-b869-2ca4da4678ef
+# ╟─e5bd8031-2c4a-4a62-b869-2ca4da4678ef
 # ╟─f2956e16-2e09-4c4e-a663-b8c5acb7b089
 # ╠═5b7b3343-1104-4856-b250-0435a3c770f9
 # ╟─1f5203a7-697e-40de-b5ba-0d44013a0a51
