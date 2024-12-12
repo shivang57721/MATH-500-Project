@@ -344,7 +344,7 @@ end
 begin
 	max_N = 500
 	num_evs = 3
-	test_N = 5:20:max_N
+	test_N = 5:10:max_N
 	errors_eigenvector = zeros(length(test_N), num_evs)
 	errors_eigenvalue = zeros(length(test_N), num_evs)
 	for (i,N) in enumerate(test_N)
@@ -381,11 +381,53 @@ Demonstrate the accuracy of your bounds across increasing values for $N$.
 At which discretisation parameter $N$ is your estimated model error (from using $\textbf{H}_\text{dir}$ instead of $\textbf{H}_\text{per}$) roughly on the same order as the discretisation error for each of the first three eigenvalues ?
 """
 
-# ╔═╡ 61388f5c-46ad-4cea-b93a-87f7185ef304
-
-
 # ╔═╡ d32943b3-d098-4b9b-bab0-5b1871d9d5ac
-# Your answer here
+md"""
+- Bauer-Fike bound is a guaranteed error bound
+- Symmetric Kato Temple bound with $\delta_{\text{est}}$ is sharp but not guaranteed
+- The estimated model error is on the same order as the discretisation error for the first three eigenvalues when N=5
+"""
+
+# ╔═╡ 8d20abfb-63ff-424b-a560-cbad23ad1e84
+begin
+	bauer_fike_errors = zeros(length(test_N), num_evs)
+	kato_temple_errors = zeros(length(test_N), num_evs)
+	true_errors = zeros(length(test_N), num_evs)
+	for (i,N) in enumerate(test_N)
+		H_per = fd_hamiltonian_periodic(cos, N)
+		_, x_approx, λ_dirichlet, x_dirichlet, λ_periodic, x_periodic = get_approx_dir_per_eigen(N, num_evs+1)
+		h = 1 / 2(2π / N)^2
+		
+		norm_r = h * sqrt.(x_dirichlet[1, :].^2 + x_dirichlet[end,:].^2)[1:num_evs]
+		bauer_fike_errors[i, :] = norm_r
+		true_errors[i, :] = abs.(λ_dirichlet - λ_periodic)[1:num_evs]
+		
+		for j in 1:num_evs
+			if j == 1
+				δ_est = abs(λ_dirichlet[j+1] - λ_dirichlet[j])
+			else
+				δ_est = min(abs(λ_dirichlet[j-1] - λ_dirichlet[j]), abs(λ_dirichlet[j+1] - λ_dirichlet[j]))
+			end
+			kato_temple_errors[i, j] = norm_r[j]^2 / δ_est
+		end
+	end
+
+	layout_bound = @layout [a; b; c]
+	plot(size=(800, 1000), layout=layout_bound)
+
+	# Add the subplots
+	plot!(yaxis=:log, subplot=1, label="Plot 1")
+	plot!(yaxis=:log, subplot=2, label="Plot 2")
+	plot!(yaxis=:log, subplot=3, label="Plot 2")
+	
+	plot!(test_N, bauer_fike_errors, label=["Eigenvector #1" "Eigenvector #2" "Eigenvector #3"], subplot=1)
+	plot!(test_N, kato_temple_errors, label=["Eigenvector #1" "Eigenvector #2" "Eigenvector #3"], subplot=2)
+	plot!(test_N, true_errors, label=["Eigenvector #1" "Eigenvector #2" "Eigenvector #3"], subplot=3)
+
+	title!("Bauer Fike", subplot=1)
+	title!("Kato Temple", subplot=2)
+	title!("True error", subplot=3)
+end
 
 # ╔═╡ 58e69281-e2d7-40d9-9c1e-4b6807b405b7
 md"""
@@ -1759,11 +1801,13 @@ Brillouin = "23470ee3-d0df-4052-8b1a-8cbd6363e7f0"
 DFTK = "acf6eb54-70d9-11e9-0013-234b7a5f5337"
 DoubleFloats = "497a8b3b-efae-58df-a0af-a86822472b78"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
+LimitedLDLFactorizations = "f5a24dde-3ab7-510b-b81b-6a72c6098d3b"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearMaps = "7a12625a-238d-50fd-b39a-03d52299707e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoTeachingTools = "661c6b06-c737-4d37-b85c-46df65de6f69"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+Preconditioners = "af69fa37-3177-5a40-98ee-561f696e4fcd"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [compat]
@@ -1772,19 +1816,27 @@ Brillouin = "~0.5.19"
 DFTK = "~0.6.20"
 DoubleFloats = "~1.4.0"
 Interpolations = "~0.15.1"
+LimitedLDLFactorizations = "~0.5.1"
 LinearMaps = "~3.11.3"
 Plots = "~1.40.5"
 PlutoTeachingTools = "~0.3.1"
 PlutoUI = "~0.7.59"
+Preconditioners = "~0.6.1"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.1"
+julia_version = "1.11.2"
 manifest_format = "2.0"
-project_hash = "2759adee6acfe44024a8dc41e46da37b938091f5"
+project_hash = "a02cbb36819f7abfc48d4e21cc63858f44394183"
+
+[[deps.AMD]]
+deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse_jll"]
+git-tree-sha1 = "45a1272e3f809d36431e57ab22703c6896b8908f"
+uuid = "14f7f29c-3bd6-536c-9a0b-7339e30b5a3e"
+version = "0.5.3"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1837,6 +1889,12 @@ weakdeps = ["StaticArrays"]
 
     [deps.Adapt.extensions]
     AdaptStaticArraysExt = "StaticArrays"
+
+[[deps.AlgebraicMultigrid]]
+deps = ["CommonSolve", "LinearAlgebra", "Printf", "Reexport", "SparseArrays"]
+git-tree-sha1 = "796eedcb42226861a51d92d28ee82d4985ee860b"
+uuid = "2169fc97-5a83-5252-b627-83903c6c433c"
+version = "0.5.1"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -2677,6 +2735,12 @@ git-tree-sha1 = "c5516f2b1655a103225e69477e3df009347580df"
 uuid = "a56a6d9d-ad03-58af-ab61-878bf78270d6"
 version = "6.1.0+0"
 
+[[deps.LimitedLDLFactorizations]]
+deps = ["AMD", "LinearAlgebra", "SparseArrays"]
+git-tree-sha1 = "07b3c94ba4decdd855770beddeab9187be03d6b8"
+uuid = "f5a24dde-3ab7-510b-b81b-6a72c6098d3b"
+version = "0.5.1"
+
 [[deps.LineSearches]]
 deps = ["LinearAlgebra", "NLSolversBase", "NaNMath", "Parameters", "Printf"]
 git-tree-sha1 = "e4c3be53733db1051cc15ecf573b1042b3a712a1"
@@ -3056,6 +3120,12 @@ deps = ["Preferences"]
 git-tree-sha1 = "5aa36f7049a63a1528fe8f7c3f2113413ffd4e1f"
 uuid = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 version = "1.2.1"
+
+[[deps.Preconditioners]]
+deps = ["AlgebraicMultigrid", "LimitedLDLFactorizations", "LinearAlgebra", "SparseArrays"]
+git-tree-sha1 = "a02fc23058e6264b0f73523e99e2dd1a20232dff"
+uuid = "af69fa37-3177-5a40-98ee-561f696e4fcd"
+version = "0.6.1"
 
 [[deps.Preferences]]
 deps = ["TOML"]
@@ -3774,10 +3844,10 @@ version = "1.4.1+1"
 # ╠═da1c7f17-aaf8-464a-b7b5-8ce2f2c5a1c4
 # ╠═d870beac-018e-44c6-8356-8ba4e337c2cd
 # ╟─eab701f2-b43e-4805-8a78-ee62dde5fc15
-# ╠═61388f5c-46ad-4cea-b93a-87f7185ef304
-# ╠═d32943b3-d098-4b9b-bab0-5b1871d9d5ac
+# ╟─d32943b3-d098-4b9b-bab0-5b1871d9d5ac
+# ╠═8d20abfb-63ff-424b-a560-cbad23ad1e84
 # ╟─58e69281-e2d7-40d9-9c1e-4b6807b405b7
-# ╟─cd99bdc8-dabf-4ddc-82a7-e79cd0f2e52b
+# ╠═cd99bdc8-dabf-4ddc-82a7-e79cd0f2e52b
 # ╠═6002d1e6-57b6-4284-a773-409308e4b58f
 # ╟─f7343721-e40b-437d-871e-b7b52201d861
 # ╠═89dc90a0-6c2c-4076-86b2-7ed79eccc988
