@@ -385,7 +385,7 @@ At which discretisation parameter $N$ is your estimated model error (from using 
 md"""
 - Bauer-Fike bound is a guaranteed error bound
 - Symmetric Kato Temple bound with $\delta_{\text{est}}$ is sharp but not guaranteed
-- The estimated model error is on the same order as the discretisation error for the first three eigenvalues when N=5
+- The estimated model error is roughly on the same order as the discretisation error: 1) never for eigenvalue 1; 2) N < 500 for eigenvalue 2; and 3) N < 100 for eigenvalue 3
 """
 
 # ╔═╡ 8d20abfb-63ff-424b-a560-cbad23ad1e84
@@ -395,7 +395,7 @@ begin
 	true_errors = zeros(length(test_N), num_evs)
 	for (i,N) in enumerate(test_N)
 		H_per = fd_hamiltonian_periodic(cos, N)
-		_, x_approx, λ_dirichlet, x_dirichlet, λ_periodic, x_periodic = get_approx_dir_per_eigen(N, num_evs+1)
+		_, _, λ_dirichlet, x_dirichlet, λ_periodic, x_periodic = get_approx_dir_per_eigen(N, num_evs+1)
 		h = 1 / 2(2π / N)^2
 		
 		norm_r = h * sqrt.(x_dirichlet[1, :].^2 + x_dirichlet[end,:].^2)[1:num_evs]
@@ -413,20 +413,21 @@ begin
 	end
 
 	layout_bound = @layout [a; b; c]
-	plot(size=(800, 1000), layout=layout_bound)
+	p = plot(size=(800, 1000), layout=layout_bound)
 
 	# Add the subplots
 	plot!(yaxis=:log, subplot=1, label="Plot 1")
 	plot!(yaxis=:log, subplot=2, label="Plot 2")
 	plot!(yaxis=:log, subplot=3, label="Plot 2")
-	
-	plot!(test_N, bauer_fike_errors, label=["Eigenvector #1" "Eigenvector #2" "Eigenvector #3"], subplot=1)
-	plot!(test_N, kato_temple_errors, label=["Eigenvector #1" "Eigenvector #2" "Eigenvector #3"], subplot=2)
-	plot!(test_N, true_errors, label=["Eigenvector #1" "Eigenvector #2" "Eigenvector #3"], subplot=3)
 
-	title!("Bauer Fike", subplot=1)
-	title!("Kato Temple", subplot=2)
-	title!("True error", subplot=3)
+	for i in 1:3
+		plot!(test_N, bauer_fike_errors[:, i], label="Bauer-Fike Error", subplot=i)
+		plot!(test_N, kato_temple_errors[:, i], label="Kato Temple Error", subplot=i)
+		plot!(test_N, true_errors[:, i], label="True Error", subplot=i)
+
+		title!("Eigenvalue $i", subplot=i)
+	end
+	p
 end
 
 # ╔═╡ 58e69281-e2d7-40d9-9c1e-4b6807b405b7
