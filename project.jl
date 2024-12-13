@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.0
+# v0.20.3
 
 using Markdown
 using InteractiveUtils
@@ -786,7 +786,26 @@ Explain why you have to recompute the Hamiltonian with `T=Float64` instead of si
 """
 
 # ╔═╡ 5b7b3343-1104-4856-b250-0435a3c770f9
-# Your answer here
+function solve_discretised(V, N; n_ep=3, tol32=1e-1, tol=1e-6, maxiter=100)
+	H64 = fd_hamiltonian_periodic(V, N; T=Float64)
+	H32 = Float32.(H64)
+
+	Pinv32 = InverseMap(factorize(H32))
+	intermediate_result = lobpcg(H32, Pinv=Pinv32, X=randn(eltype(H32), size(H32, 2), n_ep), tol=tol32, maxiter=maxiter, verbose=false)
+	iter32 = size(intermediate_result.λ, 1)
+	
+	Pinv64 = InverseMap(factorize(H64))
+	final_result = lobpcg(H64, Pinv=Pinv64, X=intermediate_result.X, tol=tol, maxiter=maxiter-iter32, verbose=false)
+	return final_result
+end
+
+# ╔═╡ 0575ec37-c8ff-46f1-b8a7-ad1d83b511ca
+let
+	plot(last.(solve_discretised(cos, 4000).residual_norms), yscale=:log10)
+	xlabel!("iteration number")
+	ylabel!("residual norm")
+	title!("residual norm evolution with mixed precision routine")
+end
 
 # ╔═╡ 1f5203a7-697e-40de-b5ba-0d44013a0a51
 md"-----------------"
@@ -805,7 +824,26 @@ Indicate clearly in your notebook the final version of your algorithm and test i
 """
 
 # ╔═╡ 87bff49e-d791-482a-94c9-c1486a4ae094
-# Your answer here
+# Solve H_dir as fast as possible:
+function solve_H_dir_fast(V, N; n_ep=3, tol32=1e-1, tol=1e-6, maxiter=100)
+	H64=fd_hamiltonian_dirichlet(V, N, T=Float64)
+	H32=Float32.(H64)
+	Pinv=InverseMap(factorize(H32))
+
+	#the lobpcg_new allows the use of a less precise preconditioner, downgrading the computation of the residual to Float32, as this precision is sufficient in our case. This makes lobpcg much faster without compromising the precision of the result.
+	intermediate_result = lobpcg_new(H32, Pinv=Pinv, X=randn(eltype(H32), size(H32, 2), n_ep), tol=tol32, maxiter=maxiter, verbose=false)
+	iter32 = size(intermediate_result.λ, 1)
+	
+	final_result = lobpcg_new(H64, Pinv=Pinv, X=intermediate_result.X, tol=tol, maxiter=maxiter-iter32, verbose=false)
+	return final_result
+	
+end
+
+# ╔═╡ 4c33a6ca-5be0-44e7-939d-b07c96e0999f
+let
+	result = @btime solve_H_dir_fast(cos, 10000, tol=1e-8)
+	plot(last.(result.residual_norms), yscale=:log10)
+end
 
 # ╔═╡ 3bf2daa3-5920-408a-b32e-0b5c25cd9580
 md"-----------------"
@@ -3882,9 +3920,11 @@ version = "1.4.1+1"
 # ╠═e5bd8031-2c4a-4a62-b869-2ca4da4678ef
 # ╟─f2956e16-2e09-4c4e-a663-b8c5acb7b089
 # ╠═5b7b3343-1104-4856-b250-0435a3c770f9
+# ╠═0575ec37-c8ff-46f1-b8a7-ad1d83b511ca
 # ╟─1f5203a7-697e-40de-b5ba-0d44013a0a51
 # ╟─776df9aa-f137-41a9-a721-af70fe6439bc
 # ╠═87bff49e-d791-482a-94c9-c1486a4ae094
+# ╠═4c33a6ca-5be0-44e7-939d-b07c96e0999f
 # ╟─3bf2daa3-5920-408a-b32e-0b5c25cd9580
 # ╟─0ecd527b-da61-4737-9f05-5f4c851a6077
 # ╟─6bdc0066-1f86-458d-aee5-6a7564f339e6
