@@ -980,7 +980,21 @@ md"""
 """
 
 # ╔═╡ 9c98cecd-53b9-483e-aecf-c925b5bfd18a
-# Your answer here
+md"""
+We first show that the Cohen-Bergstresser potential function is bounded and $\mathbb{L}$-periodic. Recall
+```math
+V(x) = \sum_{|G| < \sqrt{2\mathcal{E}_V}} \hat{V}(G) e_G(x),
+```
+The $\mathbb{L}$-periodicity of $V$ follows from the $\mathbb{L}$-periodicity of the plane wave basis functions $e_G$. For boundedness, observe
+```math
+\begin{align*}
+\sup_{x \in \mathbb{R}^3} | V(x) | &\leq \sum_{|G| < \sqrt{2\mathcal{E}_V}} |\hat{V}(G) | \cdot 
+ || e_G(x) || \\
+&\leq \sum_{|G| < \sqrt{2\mathcal{E}_V}} |\hat{V}(G)| < \infty
+\end{align*}
+```
+Therefore, $V(x)$ is a bounded $\mathbb{L}$-periodic function. By theorem 1 on the lecture on periodic problems, it follows that $H = -\frac{1}{2} \nabla + V$ is self-adjoint with domain $D(H) = H^2(\mathbb{R}^3)$.
+"""
 
 # ╔═╡ ef2796f3-b6d4-4403-aaa6-ed3d9d541a3a
 md"""
@@ -1017,7 +1031,37 @@ i.e. that each plane wave only couples via the Hamiltonian with these plane wave
 """
 
 # ╔═╡ fd4691d1-b46c-444a-96f6-443369634d59
-# Your answer here
+md"""
+First equality:
+```math
+\begin{align*}
+	\langle e_G | e_{G'} \rangle &= \frac{1}{|\Omega|} \int_\Omega e^{i G \cdot x} e^{- i G' \cdot x} dx \\
+	&= \frac{1}{|\Omega|} \int_\Omega e^{i (G - G')' \cdot x} dx \\
+	&= \delta_{G G'}
+\end{align*}
+```
+since $e^{i G \cdot x}|_{\delta \Omega}$ is constant.
+Second equality:
+```math
+\begin{align*}
+	\langle e_G | T_k e_{G'} \rangle &= \frac{1}{2|\Omega|} \int_\Omega e^{i G \cdot x} \overline{(-i \Delta_x + k)^2 e^{i G' \cdot x}} dx \\
+	&= \frac{1}{2|\Omega|} \int_\Omega e^{i G \cdot x} \overline{(-i \Delta_x + k) (G' +k) e^{i G' \cdot x}} dx \\
+	&= \frac{1}{2|\Omega|} \int_\Omega e^{i G \cdot x} \overline{(G' + k) \cdot (G' +k) e^{i G' \cdot x}} dx \\
+	&= \frac{1}{2|\Omega|} \int_\Omega e^{i G \cdot x} |G' + k|^2 e^{-i G'\cdot x} dx \\
+	&= \delta_{GG'} \frac12 |G+k|^2.
+\end{align*}
+```
+where the second and third equalities use the relation $(-i \Delta_x + k) e^{i G' \cdot x} = (G' + k) e^{i G' x}$ and the second $\Delta_x$ is interpreted as a divergence operator. Conclusion: For any $e_G \in \mathbb{B}_k^{\mathcal{E}}$ and $|\Delta G| > \sqrt{2\mathcal{E}_V}$, 
+```math
+\begin{align*}
+	\langle e_{G + \Delta G} | H_k e_{G} \rangle &= \langle e_{G + \Delta G} | V e_{G} \rangle \tag{by above} \\
+&= \sum_{|G'| < \sqrt{2\mathcal{E}_V}} \overline{\hat{V}(G')} \langle e_{G + \Delta G}, e_{G + G'} \rangle \\
+&= \sum_{|G'| < \sqrt{2\mathcal{E}_V}} \overline{\hat{V}(G')} \langle e_{\Delta G}, e_{G'} \rangle \\
+&= 0
+\end{align*}
+```
+since $\langle e_{\Delta G}, e_{G'} \rangle = 0$ for all $|G'| < \sqrt{2\mathcal{E}_V}$.
+"""
 
 # ╔═╡ 3f128396-f3b6-44b0-906e-b1a8467fd43f
 md"""
@@ -1270,8 +1314,22 @@ r_{kn} = P_k^\mathcal{F} r_{kn} = H_k^{\mathcal{F}\mathcal{F}} \widetilde{X}_{kn
 Having diagonalised the Hamiltonian using cutoff $\mathcal{E}$ we can thus obtain the *full residual* by a computation of the Hamiltonian-vector product using an elevated cutoff $\mathcal{F}$.
 """
 
-# ╔═╡ b5c07e3e-eee2-4431-9cf6-57ba8dfb199a
-# Your answer here
+# ╔═╡ 83b6b542-0eb1-4ff7-bea6-26466af478f5
+md"""
+It suffices to show
+```math
+H_k \widetilde{X}_{kn} = H_k^{\mathcal{F} \mathcal{F}} \widetilde{X}_{kn}
+```
+for some $\mathcal{F}$ large enough. Recall $\widetilde{X}_{kn}$ was computed in the plane-wave basis $\mathbb{B}_k^\mathcal{E}$. By (1), we know that if $e_G \in \mathbb{B}_k^\mathcal{E}$ and $|\Delta G| > \sqrt{2 \mathcal{E}_V}$ then $\langle e_{G + \Delta G} | H_k e_{G} \rangle = 0$, so
+```math
+\langle e_{G + \Delta G} | H_k \widetilde{X}_{kn} \rangle = 0
+```
+so we can take $\mathcal{F} = \mathcal{E} + \mathcal{E}_V$, because then if $e_G \not\in \mathbb{B}_k^\mathcal{F}$, then $\frac{1}{2} |G + k|^2 \geq \mathcal{E} + \mathcal{E}_V$ and so $G$ can be written as $G = G' + \Delta G$ for some $e_{G'} \in \mathbb{B}_k^\mathcal{E}$ and $|\Delta G| > \sqrt{2 \mathcal{E} V}$. Thus, $H_k \widetilde{X}_{kn}$ can be expressed entirely in the basis $\mathbb{B}_k^\mathcal{F}$ and so
+```math
+H_k \widetilde{X}_{kn} = H_k^{\mathcal{F} \mathcal{F}} \widetilde{X}_{kn}
+```
+as required.
+"""
 
 # ╔═╡ abdfcc43-245d-425a-809e-d668f03e9b45
 md"""
@@ -1547,6 +1605,7 @@ md"""
 
 # ╔═╡ 677a71e3-b17b-42b2-b3c7-f21cd0f81861
 # Your answer here
+# N(H_kee - mu) = n-1 and N(Smu) = 0
 
 # ╔═╡ a70934fa-e78f-4592-90f8-57af5e9cb87a
 md"""
@@ -3931,10 +3990,10 @@ version = "1.4.1+1"
 # ╟─d3e0a2e9-9d89-476b-8d37-da7b14904b1e
 # ╟─d12f9337-0b87-40cb-817d-8a4ac3858196
 # ╟─354b8072-dcf0-4182-9897-c3e9534bef5a
-# ╠═9c98cecd-53b9-483e-aecf-c925b5bfd18a
+# ╟─9c98cecd-53b9-483e-aecf-c925b5bfd18a
 # ╟─ef2796f3-b6d4-4403-aaa6-ed3d9d541a3a
 # ╟─7495739f-56b0-4076-8c91-f4155d2ba00f
-# ╠═fd4691d1-b46c-444a-96f6-443369634d59
+# ╟─fd4691d1-b46c-444a-96f6-443369634d59
 # ╟─3f128396-f3b6-44b0-906e-b1a8467fd43f
 # ╟─05d40b5e-fd83-4e73-8c78-dfd986a42fc0
 # ╠═c4393902-7c57-4126-80af-8765bea42ebd
@@ -3966,7 +4025,7 @@ version = "1.4.1+1"
 # ╟─ba1ba08f-7fe5-4fb3-b736-adaf7200af08
 # ╟─58856ccd-3a1c-4a5f-9bd2-159be331f07c
 # ╟─e04087db-9973-4fad-a964-20d109fff335
-# ╠═b5c07e3e-eee2-4431-9cf6-57ba8dfb199a
+# ╟─83b6b542-0eb1-4ff7-bea6-26466af478f5
 # ╟─abdfcc43-245d-425a-809e-d668f03e9b45
 # ╠═ceb72ee7-f7ac-4a49-a585-78e1d55cde2a
 # ╟─d26fec73-4416-4a20-bdf3-3a4c8ea533d1
