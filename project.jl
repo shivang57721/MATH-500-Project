@@ -1474,15 +1474,24 @@ md"""
 """
 
 # ╔═╡ 4cc3ded3-9c62-4af5-be73-7f52fa6ed177
-# Your answer here
+md"""
+We can not hope to use Kato temple on $H$ as $H$ has no discrete spectrum. We can use Kato temple for $H_k$ to get a reliable error bound for $\lambda_{kn}$ as a discrete spectrum, but we have to take the degeneracies into account. Also we have t o assume that we are not missing any eigenvalue $\lambda_{kn}$ so that we can have a reliable estimate for $\delta$
+"""
 
 # ╔═╡ a1c02b0d-da66-4b1a-9a4b-2a5dd7997232
 md"""
 **(b)** Assume that our numerical procedure (discretisation + diagonalisation) for all considered cutoffs is sufficiently good, such that no eigenpairs are missed. Employ the prevously discussed (e.g. Sheet 6) technique of combining Kato-Temple and Bauer-Fike estimates to obtain an improved estimate for the error in the eigenvalue. Add your estimate for the first eigenvalue at the $Γ$-point to your plot in Task 2.2 (d). What do you observe ?
 """
 
-# ╔═╡ bfdc1d7f-1899-449d-ac10-6e8b83302823
-# Your answer here
+# ╔═╡ 21632ccc-690f-4fed-9091-a9444e0a79d2
+for (ik, kpt) in enumerate(basis_one.kpoints)
+	hamk = ham_one[ik]
+	λk   = eigres_one.eigenvalues[ik]
+	Xk   = eigres_one.ψ[ik]
+
+	residual_k = hamk * Xk - Xk * Diagonal(λk)
+	println(ik, "  ", norm(residual_k))
+end
 
 # ╔═╡ 7ed09f35-a22b-47c0-9ada-e3c11a9645a8
 md"""
@@ -4055,7 +4064,7 @@ version = "1.4.1+1"
 # ╟─5f0d20d1-c5f0-43b8-b65d-d5a2039cd01a
 # ╠═4cc3ded3-9c62-4af5-be73-7f52fa6ed177
 # ╟─a1c02b0d-da66-4b1a-9a4b-2a5dd7997232
-# ╠═bfdc1d7f-1899-449d-ac10-6e8b83302823
+# ╠═21632ccc-690f-4fed-9091-a9444e0a79d2
 # ╟─7ed09f35-a22b-47c0-9ada-e3c11a9645a8
 # ╠═63b1a886-6b63-4219-a941-f1a699f0d614
 # ╟─5f5f139e-57f9-4b2f-8398-a13fbe119fb5
