@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.3
+# v0.20.0
 
 using Markdown
 using InteractiveUtils
@@ -1576,7 +1576,26 @@ where the use of $V$ instead of $H$ indicates that the kinetic term does not con
 """
 
 # ╔═╡ 6a8ceca2-05f1-4846-b620-fe44d4c3e0d3
-# Your answer here
+md"""
+By 2.1, we know that if $e_G \in \mathbb{B}_k^{\mathcal{E}}$ and $|ΔG| > \sqrt{2\mathcal{E}_V}$ then
+```math
+\langle e_{G + ΔG}, H_k e_G \rangle = 0
+```
+Thus, by choosing $\mathcal{F} = \mathcal{E} + \mathcal{E}_V$, we obtain that for any $G \in \mathbb{B}_k^{\mathcal{E}}$ and $G' \notin  \mathbb{B}_k^{\mathcal{F}}$ so that $|G' - G| = |ΔG| > \sqrt{2\mathcal{E}_V}$,
+```math
+\langle e_{G'}, H_k e_G \rangle = 0
+```
+so $H_k^{\mathcal{F}^\perp \mathcal{E}} = H_k^{\mathcal{E} \mathcal{F}^\perp} = 0$. Now, for $G' \in \mathbb{B}_k^{\mathcal{F}}$ but $G' \not\in \mathbb{B}_k^{\mathcal{E}}$ so that $G \not= G'$, we have
+```math
+\begin{align*}
+\langle e_{G'}, H_k e_G \rangle &= \langle e_{G'}, (T_k + V) e_G \rangle \\
+&=\langle e_{G'}, T_k e_G \rangle + \langle e_{G'}, V e_G \rangle\\
+&=\delta_{GG'} \frac12 |G+k|^2 + \langle e_{G'}, V e_G \rangle \\
+&= \langle e_{G'}, V e_G \rangle
+\end{align*}
+```
+Thus, $H_k^{\mathcal{E} \mathcal{R}} = V_k^{\mathcal{E} \mathcal{R}}$ and by symmetry $H_k^{\mathcal{R} \mathcal{E}} = V_k^{\mathcal{R} \mathcal{E}}$. A similar argument shows $H_k^{\mathcal{R} \mathcal{F}^\perp} = V_k^{\mathcal{R} \mathcal{F}^\perp}$ and by symmetry $H_k^{\mathcal{F}^\perp \mathcal{R}} = V_k^{\mathcal{F}^\perp \mathcal{R}}$.
+"""
 
 # ╔═╡ 012d944c-be57-4021-994f-eb0090b52e2b
 md"----"
@@ -1614,7 +1633,11 @@ md"""
 
 # ╔═╡ 677a71e3-b17b-42b2-b3c7-f21cd0f81861
 # Your answer here
-# N(H_kee - mu) = n-1 and N(Smu) = 0
+md"""
+If $\mu \in (\widetilde{\lambda}_{k, n-1}, \widetilde{\lambda}_{kn})$ such that $S_\mu \geq 0$, then $N(H_k^{\mathcal{E} \mathcal{E}} - \mu) = n-1$ since subtracting $\mu$ shifts all the eigenvalues of $H_k^{\mathcal{E} \mathcal{E}}$ down by $\mu$ so the negative eigenvalues will be $\widetilde{\lambda}_{k, 1} - \mu, \ldots, \widetilde{\lambda}_{k, n-1} - \mu$.
+
+Since $S_\mu \geq 0$, $N(S_\mu) = 0$. Thus, by the Haynsworth interia additivity formula $N(H_k - \mu) = n-1$ and so $\mu > \lambda_{kn}$.
+"""
 
 # ╔═╡ a70934fa-e78f-4592-90f8-57af5e9cb87a
 md"""
@@ -1659,6 +1682,39 @@ Prove the following statements:
 
 # ╔═╡ 3fd29e37-d6ea-427a-9b25-2e1dcba42ed0
 # Your answer here
+md"""
+(1) Since $X = \text{span}\{e_G \, \Big| \, \frac{1}{2}|G + k|^2 \geq  \mathcal{E}\}$, it suffices to prove the first inequality for $x = e_G$ where $\frac{1}{2}|G + k|^2 \geq  \mathcal{E}$. 
+```math
+\begin{align*}
+\langle e_G | (H_k^{\mathcal{E}^\perp \mathcal{E}^\perp} - \mu) e_G \rangle &= \langle e_G | Q_k^{\mathcal{E}^\perp}(T_k + V) e_G \rangle - \mu \\
+&= \langle e_G | \frac{1}{2} |G + k|^2 e_G \rangle + \langle e_G | Q_k^{\mathcal{E}^\perp} V e_G\rangle - \mu \\
+&\geq \mathcal{E} - \|V_k^{\mathcal{E}^\perp\mathcal{E}^\perp} \|_\text{op} - \mu
+\end{align*}
+```
+where $\langle e_G | Q_k^{\mathcal{E}^\perp} V e_G\rangle \geq - \|V_k^{\mathcal{E}^\perp\mathcal{E}^\perp} \|_\text{op}$ follows from definition.
+"""
+
+# ╔═╡ d5de7b64-db19-48cf-81e4-d1f48c6ed08b
+md"""
+(2) Again, it suffices to prove the inequality for $x = e_G$ where $\frac{1}{2} | G + k|^2 \geq \mathcal{E}$.
+```math
+\begin{align}
+\left\langle e_G \, \middle|\,
+  V_k^{\mathcal{E}^\perp\mathcal{E}} \left( H_k^{\mathcal{E} \mathcal{E}} - \mu   \right)^{-1} V_k^{\mathcal{E}\mathcal{E}^\perp} e_G \right\rangle &\leq \| V_k^{\mathcal{E}^\perp\mathcal{E}} \left( H_k^{\mathcal{E} \mathcal{E}} - \mu   \right)^{-1} V_k^{\mathcal{E}\mathcal{E}^\perp} \|_{\text{op}} \\
+&= \| V_k^{\mathcal{E}^\perp\mathcal{E}} \left( \widetilde{X}_k \widetilde{Λ}_k \widetilde{X}_k^H - \mu   \right)^{-1} V_k^{\mathcal{E}\mathcal{E}^\perp} \|_{\text{op}} \\
+&= \| V_k^{\mathcal{E}^\perp\mathcal{E}} \widetilde{X}_k \left( \widetilde{Λ}_k - \mu \right)^{-1} \widetilde{X}_k^H V_k^{\mathcal{E}\mathcal{E}^\perp} \|_{\text{op}} \\
+&= \left\| \left( V_k^{\mathcal{R}\mathcal{E}} \widetilde{X}_k \right) \left( \widetilde{Λ}_k - \mu \right)^{-1} \left( V_k^{\mathcal{R}\mathcal{E}} \widetilde{X}_k \right)^H \right\|_{\text{op}} \\
+&\leq \left\|V_k^{\mathcal{R}\mathcal{E}} \widetilde{X}_k \right\|_{\text{op}}^2 \left\| \left(\widetilde{Λ}_k - \mu \right)^{-1} \right\|_{\text{op}} \\
+&\leq \frac{\| V_k \|^2_{\text{op}}}{\min |\widetilde{λ}_{kj} - \mu|} \\
+&= \frac{\| V_k \|^2_{\text{op}}}{\widetilde{λ}_{kn} - \mu}
+\end{align}
+```
+"""
+
+# ╔═╡ e2ff4156-5894-4ed6-a52e-6909c5f03bf8
+md"""
+(3) Now we combine both inequalities to derive
+"""
 
 # ╔═╡ 5bfb143e-414b-4283-9a6a-be99452aa1b5
 md"----"
@@ -4070,13 +4126,15 @@ version = "1.4.1+1"
 # ╟─5f5f139e-57f9-4b2f-8398-a13fbe119fb5
 # ╟─14df1c0f-1c4f-4da9-be49-3941b9c12fd3
 # ╟─3fc07beb-33c1-43b3-9d66-27693d78e46a
-# ╠═6a8ceca2-05f1-4846-b620-fe44d4c3e0d3
+# ╟─6a8ceca2-05f1-4846-b620-fe44d4c3e0d3
 # ╟─012d944c-be57-4021-994f-eb0090b52e2b
 # ╟─047d630b-e85e-45e9-9574-758955cb160e
 # ╟─57a4ebd3-d850-4490-9992-957c15d26aea
-# ╠═677a71e3-b17b-42b2-b3c7-f21cd0f81861
+# ╟─677a71e3-b17b-42b2-b3c7-f21cd0f81861
 # ╟─a70934fa-e78f-4592-90f8-57af5e9cb87a
-# ╠═3fd29e37-d6ea-427a-9b25-2e1dcba42ed0
+# ╟─3fd29e37-d6ea-427a-9b25-2e1dcba42ed0
+# ╟─d5de7b64-db19-48cf-81e4-d1f48c6ed08b
+# ╟─e2ff4156-5894-4ed6-a52e-6909c5f03bf8
 # ╟─5bfb143e-414b-4283-9a6a-be99452aa1b5
 # ╟─d6e7e0d0-52d8-4306-bde0-1a55598ed6af
 # ╟─d4792fec-7762-4c2b-9be8-3c6c6791bd3d
