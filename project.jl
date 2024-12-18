@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.0
+# v0.19.46
 
 using Markdown
 using InteractiveUtils
@@ -1226,16 +1226,18 @@ function calculate_eigenvalues(model, Ecut)
 end
 
 # ╔═╡ 580e4dc0-b4dd-4f63-9db7-7fdebf225f1c
-begin
-	# Define a range of Ecut values to test
-	Ecut_values = 5:0.5:30
-end
+# Define a range of Ecut values to test
+Ecut_values = 5:1:30
 
 # ╔═╡ bfcf40d8-3855-454b-843b-fe3bdd1e5a92
-begin
-	# Initialize a matrix to store the results
-	eigenvalues = zeros(length(Ecut_values), 2)
-end
+# Initialize a matrix to store the results and difference to reference (eign1)(eign2)
+eigenvalues = zeros(length(Ecut_values), 2);
+
+# ╔═╡ 8730b929-31a1-40ed-afa3-35d539a364aa
+eigen_diff = zeros(length(Ecut_values), 2);
+
+# ╔═╡ 9115099c-9af4-42fd-b688-70d0858dbeff
+ref_eign = calculate_eigenvalues(model, 80)[1]
 
 # ╔═╡ 20c15f08-8bf9-4c6b-84ab-4486ba0a9237
 # Loop over Ecut values and calculate eigenvalues
@@ -1243,28 +1245,18 @@ for (i, Ecut) in enumerate(Ecut_values)
     eigenvalues[i, :] = calculate_eigenvalues(model, Ecut)[1]
 end
 
+# ╔═╡ 0b341e85-e4e1-4887-982e-c7de6bef55a8
+eigen_diff_abs = abs.(eigen_diff)
+
 # ╔═╡ e0c6e8d3-4f0a-4be6-805f-79fb012c01d8
 begin
 	# Plot the results
-	plot(Ecut_values, eigenvalues[:, 1], label="First Eigenvalue")
-	#plot!(Ecut_values, eigenvalues[:, 2], label="Second Eigenvalue")
+	plot(Ecut_values, eigen_diff_abs[:, 1], label="First Eigenvalue", yaxis=:log)
+	plot!(Ecut_values, eigen_diff_abs[:, 2], label="Second Eigenvalue", yaxis=:log)
 	xlabel!("Ecut")
-	ylabel!("Eigenvalue")
+	ylabel!("Eigenvalue Difference to Reference")
 	title!("Eigenvalues vs. Ecut")
 end
-
-# ╔═╡ 0e0ed0c6-ab11-4d4e-9552-3c89f7bd1392
-begin
-	# Plot the results
-	#plot(Ecut_values, eigenvalues[:, 1], label="First Eigenvalue")
-	plot(Ecut_values, eigenvalues[:, 2], label="Second Eigenvalue")
-	xlabel!("Ecut")
-	ylabel!("Eigenvalue")
-	title!("Eigenvalues vs. Ecut")
-end
-
-# ╔═╡ 5daa306b-0dfe-4d4b-9e03-1ed7b50d6c61
-calculate_eigenvalues(model, 80)[1]
 
 # ╔═╡ ba1ba08f-7fe5-4fb3-b736-adaf7200af08
 md"""-------------"""
@@ -1341,7 +1333,88 @@ Using this technique you can compute the application of the Hamiltonian using a 
 """
 
 # ╔═╡ ceb72ee7-f7ac-4a49-a585-78e1d55cde2a
-# Your answer here
+md"""
+https://www.fisica.uniud.it/~giannozz/Corsi/MQ/LectureNotes/cohenbergstresser.pdf
+"""
+
+# ╔═╡ 06e1f7f3-ea56-43dd-8c4b-fe5191d32755
+# Function to compute residue based on e_cut and F
+function compute_residue(e_cut, F, model)
+    # Define PlaneWaveBasis with the given energy cutoff
+    basis_small = PlaneWaveBasis(model; Ecut=e_cut, kgrid=(1, 1, 1))
+    
+    # Define Hamiltonian based on the energy cutoff
+    ham_small = Hamiltonian(basis_small)
+    
+    # Solve the eigenvalue problem for 1 band
+    eigres_small = diagonalize_auto(ham_small, 1)
+    X_small=eigres_small.ψ
+	eigen_small=eigres_small.eigenvalues[1]
+	
+    # Compute the "mapped" residue for the higher cutoff F
+    basis_large = PlaneWaveBasis(model; Ecut=F, kgrid=(1, 1, 1))
+    ham_large = Hamiltonian(basis_large)
+	#X_large_mapped = transfer_blochwave(X_small, basis_small, basis_large)
+
+	# Solve the eigenvalue problem for 1 band with higher cutoff
+    eigres_large = diagonalize_auto(ham_large, 1)
+    X_large=eigres_large.ψ
+	eigen_large=eigres_large.eigenvalues[1]
+	
+    # Residual calculation (difference in the eigenvalue energies)
+    residual_small = ham_small * X_small#-eigen_small.*X_small
+	residual_small_map = transfer_blochwave(X_small, basis_small, basis_large)
+	residual_large = ham_large * X_large#-eigen_large.*X_large
+
+	residual_diff = norm(residual_large-residual_small_map)
+	e_v = F - e_cut
+    return residual_diff, e_v
+end
+
+# ╔═╡ e303171b-2c22-4aae-b02f-55ab72b05ddf
+begin
+	# Define ranges for e_cut and F
+	e_cuts = 5:5:20   # Energy cutoffs from 5 to 30 in steps of 5
+	F_values = 30:10:50  # F values from 60 to 100 in steps of 10
+	
+	# Arrays to store results
+	residual_diffs = Float64[]
+	e_vs = Float64[]
+	Fs = Int[]  # Array to store corresponding F values
+end
+
+# ╔═╡ 97b02aef-36c1-4dfb-ba90-81930ee8b2eb
+# Loop over e_cuts and F_values
+for e_cut in e_cuts
+    for F in F_values
+        if F > e_cut  # Ensure F is greater than e_cut
+            residual_diff, e_v = compute_residue(e_cut, F, model)
+            push!(residual_diffs, residual_diff)
+            push!(e_vs, e_v)
+			push!(Fs, F)  # Store F value
+        end
+    end
+end
+
+# ╔═╡ 22032ef0-1a1a-4960-a6fe-fe46091a4fa5
+begin
+	# Plot the results
+	unique_Fs = unique(Fs)  # Unique F values for grouping
+	plot()
+	
+	# Add scatter plots for each F value with its own color
+	for F in unique_Fs
+	    idx = findall(Fs .== F)  # Indices where F matches
+	    scatter!(e_vs[idx], residual_diffs[idx], label="F = $F", 
+	             xlabel="e_v (F - e_cut)", 
+	             ylabel="norm(H^e*X_e-H^F*H_F)", title="Residual Difference vs Energy Difference")
+	end
+	
+	# Finalize the plot with legend
+	plot!(legend=:bottomleft)
+end
+
+#To me the norm is so high (in the range of vector size), however, I tried to calculate the residue with eigen value, the difference in norm is always 1
 
 # ╔═╡ d26fec73-4416-4a20-bdf3-3a4c8ea533d1
 md"""
@@ -1349,7 +1422,115 @@ md"""
 """
 
 # ╔═╡ b1270539-8079-4761-ab61-55d08d563635
-# Your answer here
+# Function to compute the norm2 of each column of residual matrices, this will use for Baure-Fike bound
+function compute_column_norms(residuals)
+    column_norms = []  # Array to store norms for all k-points and columns
+
+    # Loop over each k-point residual matrix
+    for residual_k in residuals
+        # Compute norm2 (Euclidean norm) for each column
+        norms_k = [norm(residual_k[:, j], 2) for j in 1:size(residual_k, 2)]
+        push!(column_norms, norms_k)  # Append the column norms
+    end
+
+    return column_norms
+end
+
+
+# ╔═╡ ac3f6914-d476-4ddf-8ff7-3801bba7f2df
+# Define the mother_solver function
+function mother_solver(model, E_cut::Float64, n_band::Int)
+    # Step 1: Define the PlaneWaveBasis
+    basis = PlaneWaveBasis(model; Ecut=E_cut, kgrid=(1, 1, 1))
+
+    # Step 2: Define the Hamiltonian
+    ham = Hamiltonian(basis)
+
+    # Step 3: Diagonalize the Hamiltonian for n_band bands (Float64 precision)
+    eigres = diagonalize_auto(ham, n_band)
+    eigenvalues_float64 = eigres.eigenvalues
+
+    # Step 4: Calculate residuals for each k-point and eigenvalue
+    residuals = []  # Array to store residual norms for all k-points
+    for (ik, kpt) in enumerate(basis.kpoints)
+        hamk = ham[ik]                     # Hamiltonian for the k-point
+        λk = eigres.eigenvalues[ik]        # Eigenvalues at the k-point
+        Xk = eigres.ψ[ik]                  # Eigenvectors at the k-point
+
+        # Compute the residual for all bands at this k-point
+        residual_k = hamk * Xk - Xk * Diagonal(λk)
+        push!(residuals, residual_k)  # Store the residual
+    end
+
+	residual_norm=compute_column_norms(residuals)
+
+    # Step 5: Solve again in BigFloat precision
+    setprecision(BigFloat, 256)  # Increase precision for BigFloat
+    basis_big = PlaneWaveBasis(model; Ecut=BigFloat(E_cut), kgrid=(1, 1, 1))
+    ham_big = Hamiltonian(basis_big)
+    eigres_big = diagonalize_auto(ham_big, n_band)
+    eigenvalues_bigfloat = eigres_big.eigenvalues
+
+    # Step 6: Calculate arithmetic error
+    arithmetic_errors = []
+    for (ik, λ_float64) in enumerate(eigenvalues_float64)
+        λ_bigfloat_converted = Float64.(eigenvalues_bigfloat[ik])  # Convert BigFloat to Float64
+        errors_k = abs.(λ_float64 - λ_bigfloat_converted)  # Absolute difference
+        push!(arithmetic_errors, errors_k)
+    end
+
+    # Step 7: Return eigenvalues, eigenvectors, residuals, and arithmetic errors
+    return eigenvalues_float64[1], eigres.ψ, residual_norm[1], arithmetic_errors[1]
+end
+
+
+# ╔═╡ 69b8bec9-7078-4aae-8bba-ae7dee9faa3a
+begin
+	eigenvalues_es=[]
+	eigenvvectors_es=[]
+	residuals_es=[]
+	arithmetic_errors_es=[]
+	for e_cut in Ecut_values
+		eigenvalues_e, eigenvvectors_e, residuals_e, arithmetic_errors_e = mother_solver(model, 10.0, 2)
+		push!(eigenvalues_es, eigenvalues_e)
+		push!(eigenvvectors_es, eigenvvectors_e)
+		push!(residuals_es, residuals_e)
+		push!(arithmetic_errors_es, arithmetic_errors_e)
+	end
+end
+
+# ╔═╡ cf741530-0bf3-4278-a2e9-b0768952d243
+begin
+	residuals_combined = hcat(map(x -> x, residuals_es)...)'  # Transpose each row and combine
+
+	arithmetic_combined = hcat(map(x -> x, arithmetic_errors_es)...)'  # Transpose each row and combine
+end
+
+# ╔═╡ 236c069f-71b9-4b4e-9ef6-bb4cc5bbd931
+begin
+    # Plot the results
+    plot(Ecut_values, eigen_diff_abs[:, 1], label="First Eigenvalue Difference with Reference", yaxis=:log)
+    plot!(Ecut_values, residuals_combined[:, 1], label="First Eigenvalue Algorithmic Error (Baure-Fike bound)", yaxis=:log)
+    plot!(Ecut_values, arithmetic_combined[:, 1], label="First Eigenvalue Arithmetic Error", yaxis=:log)
+    xlabel!("Ecut")
+    ylabel!("Eigenvalue Difference to Reference")
+    title!("Eigenvalues vs. Ecut")
+    plot!(legend=:outerbottom)  # Move the legend to the top-left corner
+end
+
+
+# ╔═╡ 6b36d516-ba67-4c17-8ba2-174dcf8a1136
+begin
+    # Plot the results
+    plot(Ecut_values, eigen_diff_abs[:, 2], label="Second Eigenvalue Difference with Reference", yaxis=:log)
+    plot!(Ecut_values, residuals_combined[:, 2], label="Second Eigenvalue Algorithmic Error (Baure-Fike bound)", yaxis=:log)
+    plot!(Ecut_values, arithmetic_combined[:, 2], label="Second Eigenvalue Arithmetic Error", yaxis=:log)
+    xlabel!("Ecut")
+    ylabel!("Eigenvalue Difference to Reference")
+    title!("Eigenvalues vs. Ecut")
+    plot!(legend=:outerbottom)  # Move the legend to the top-left corner
+end
+
 
 # ╔═╡ 9a953b4e-2eab-4cb6-8b12-afe754640e22
 md"""----"""
@@ -4083,18 +4264,28 @@ version = "1.4.1+1"
 # ╠═56108a52-61ed-43fc-bd0d-7fc4221f05ce
 # ╠═580e4dc0-b4dd-4f63-9db7-7fdebf225f1c
 # ╠═bfcf40d8-3855-454b-843b-fe3bdd1e5a92
+# ╠═8730b929-31a1-40ed-afa3-35d539a364aa
+# ╠═9115099c-9af4-42fd-b688-70d0858dbeff
 # ╠═20c15f08-8bf9-4c6b-84ab-4486ba0a9237
+# ╠═0b341e85-e4e1-4887-982e-c7de6bef55a8
 # ╠═e0c6e8d3-4f0a-4be6-805f-79fb012c01d8
-# ╠═0e0ed0c6-ab11-4d4e-9552-3c89f7bd1392
-# ╠═5daa306b-0dfe-4d4b-9e03-1ed7b50d6c61
 # ╟─ba1ba08f-7fe5-4fb3-b736-adaf7200af08
 # ╟─58856ccd-3a1c-4a5f-9bd2-159be331f07c
 # ╟─e04087db-9973-4fad-a964-20d109fff335
 # ╟─83b6b542-0eb1-4ff7-bea6-26466af478f5
 # ╟─abdfcc43-245d-425a-809e-d668f03e9b45
 # ╠═ceb72ee7-f7ac-4a49-a585-78e1d55cde2a
+# ╠═06e1f7f3-ea56-43dd-8c4b-fe5191d32755
+# ╠═e303171b-2c22-4aae-b02f-55ab72b05ddf
+# ╠═97b02aef-36c1-4dfb-ba90-81930ee8b2eb
+# ╠═22032ef0-1a1a-4960-a6fe-fe46091a4fa5
 # ╟─d26fec73-4416-4a20-bdf3-3a4c8ea533d1
 # ╠═b1270539-8079-4761-ab61-55d08d563635
+# ╠═ac3f6914-d476-4ddf-8ff7-3801bba7f2df
+# ╠═69b8bec9-7078-4aae-8bba-ae7dee9faa3a
+# ╠═cf741530-0bf3-4278-a2e9-b0768952d243
+# ╠═236c069f-71b9-4b4e-9ef6-bb4cc5bbd931
+# ╠═6b36d516-ba67-4c17-8ba2-174dcf8a1136
 # ╟─9a953b4e-2eab-4cb6-8b12-afe754640e22
 # ╟─0616cc6b-c5f8-4d83-a247-849a3d8c5de8
 # ╠═d363fa0a-d48b-4904-9337-098bcef015bb
