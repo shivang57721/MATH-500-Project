@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.46
+# v0.20.0
 
 using Markdown
 using InteractiveUtils
@@ -1371,50 +1371,99 @@ function compute_residue(e_cut, F, model)
     return residual_diff, e_v
 end
 
-# ╔═╡ e303171b-2c22-4aae-b02f-55ab72b05ddf
-begin
-	# Define ranges for e_cut and F
-	e_cuts = 5:5:20   # Energy cutoffs from 5 to 30 in steps of 5
-	F_values = 30:10:50  # F values from 60 to 100 in steps of 10
+# ╔═╡ b70a1c21-ec54-4080-b599-dba2b2816c14
+function compute_projected_residual(model, E_cut, F, bands)
+    basis_small = PlaneWaveBasis(model; Ecut=E_cut, kgrid=(1, 1, 1))
+    ham_small = Hamiltonian(basis_small)
+    
+    eigres_small = diagonalize_auto(ham_small, bands)
+    X_small = eigres_small.ψ[1]
+	λ_k = eigres_small.eigenvalues[1]
 	
-	# Arrays to store results
-	residual_diffs = Float64[]
-	e_vs = Float64[]
-	Fs = Int[]  # Array to store corresponding F values
+    basis_large = PlaneWaveBasis(model; Ecut=F, kgrid=(1, 1, 1))
+    ham_large = Hamiltonian(basis_large)
+	
+	X_large = transfer_blochwave_kpt(X_small, basis_small, basis_small.kpoints[1], basis_large, basis_large.kpoints[1])
+	residual = ham_large[1] * X_large - X_large .* λ_k'
+	
+    return mapslices(norm, residual; dims=1)
 end
+
+# ╔═╡ 6c43ae48-fdbb-4a0b-b6a3-121689aac240
+begin
+	E_cut_values = 10:1:15
+	plot_Ecut = plot(size=(800, 1000), layout=@layout [a; b])
+
+	# Add the subplots
+	plot!(yaxis=:log, subplot=1, xlabel="F - E_cut", ylabel="diff(residual)", title="Eigenvalue #1")
+	plot!(yaxis=:log, subplot=2, xlabel="F - E_cut", ylabel="diff(residual)", title="Eigenvalue #2")
+	
+	for E_cut in E_cut_values
+		F_values = (E_cut+1):1:(E_cut+15)
+		residuals = zeros(length(F_values), 2)
+		for (i, F) in enumerate(F_values)
+			residuals[i, :] = compute_projected_residual(model, E_cut, F, 2)
+		end
+
+		filtered_diff1 = diff(residuals[:, 1])[diff(residuals[:, 1]) .> 0]
+		filtered_diff2 = diff(residuals[:, 2])[diff(residuals[:, 2]) .> 0]
+
+		plot!(filtered_diff1, subplot=1, label="Ecut=$E_cut", marker=:circle)
+		plot!(filtered_diff2, subplot=2, label="Ecut=$E_cut", marker=:circle)
+	end
+	plot_Ecut
+end
+
+
+# ╔═╡ da3729b4-fb64-47d0-ac55-a89804355a43
+md"""
+Based on the plot above, a reasonable estimate for $\mathcal{E}_V = \mathcal{F} - \mathcal{E}$ is $\mathcal{E}_V = 10$, since this is roughly the point where the pairwise difference in the projected residual reaches machine precision.
+"""
+
+# ╔═╡ e303171b-2c22-4aae-b02f-55ab72b05ddf
+# begin
+# 	# Define ranges for e_cut and F
+# 	e_cuts = 5:5:20   # Energy cutoffs from 5 to 30 in steps of 5
+# 	F_values = 30:10:50  # F values from 60 to 100 in steps of 10
+	
+# 	# Arrays to store results
+# 	residual_diffs = Float64[]
+# 	e_vs = Float64[]
+# 	Fs = Int[]  # Array to store corresponding F values
+# end
 
 # ╔═╡ 97b02aef-36c1-4dfb-ba90-81930ee8b2eb
-# Loop over e_cuts and F_values
-for e_cut in e_cuts
-    for F in F_values
-        if F > e_cut  # Ensure F is greater than e_cut
-            residual_diff, e_v = compute_residue(e_cut, F, model)
-            push!(residual_diffs, residual_diff)
-            push!(e_vs, e_v)
-			push!(Fs, F)  # Store F value
-        end
-    end
-end
+# # Loop over e_cuts and F_values
+# for e_cut in e_cuts
+#     for F in F_values
+#         if F > e_cut  # Ensure F is greater than e_cut
+#             residual_diff, e_v = compute_residue(e_cut, F, model)
+#             push!(residual_diffs, residual_diff)
+#             push!(e_vs, e_v)
+# 			push!(Fs, F)  # Store F value
+#         end
+#     end
+# end
 
 # ╔═╡ 22032ef0-1a1a-4960-a6fe-fe46091a4fa5
-begin
-	# Plot the results
-	unique_Fs = unique(Fs)  # Unique F values for grouping
-	plot()
+# begin
+# 	# Plot the results
+# 	unique_Fs = unique(Fs)  # Unique F values for grouping
+# 	plot()
 	
-	# Add scatter plots for each F value with its own color
-	for F in unique_Fs
-	    idx = findall(Fs .== F)  # Indices where F matches
-	    scatter!(e_vs[idx], residual_diffs[idx], label="F = $F", 
-	             xlabel="e_v (F - e_cut)", 
-	             ylabel="norm(H^e*X_e-H^F*H_F)", title="Residual Difference vs Energy Difference")
-	end
+# 	# Add scatter plots for each F value with its own color
+# 	for F in unique_Fs
+# 	    idx = findall(Fs .== F)  # Indices where F matches
+# 	    scatter!(e_vs[idx], residual_diffs[idx], label="F = $F", 
+# 	             xlabel="e_v (F - e_cut)", 
+# 	             ylabel="norm(H^e*X_e-H^F*H_F)", title="Residual Difference vs Energy Difference")
+# 	end
 	
-	# Finalize the plot with legend
-	plot!(legend=:bottomleft)
-end
+# 	# Finalize the plot with legend
+# 	plot!(legend=:bottomleft)
+# end
 
-#To me the norm is so high (in the range of vector size), however, I tried to calculate the residue with eigen value, the difference in norm is always 1
+# #To me the norm is so high (in the range of vector size), however, I tried to calculate the residue with eigen value, the difference in norm is always 1
 
 # ╔═╡ d26fec73-4416-4a20-bdf3-3a4c8ea533d1
 md"""
@@ -4408,8 +4457,11 @@ version = "1.4.1+1"
 # ╟─e04087db-9973-4fad-a964-20d109fff335
 # ╟─83b6b542-0eb1-4ff7-bea6-26466af478f5
 # ╟─abdfcc43-245d-425a-809e-d668f03e9b45
-# ╠═ceb72ee7-f7ac-4a49-a585-78e1d55cde2a
+# ╟─ceb72ee7-f7ac-4a49-a585-78e1d55cde2a
 # ╠═06e1f7f3-ea56-43dd-8c4b-fe5191d32755
+# ╠═b70a1c21-ec54-4080-b599-dba2b2816c14
+# ╠═6c43ae48-fdbb-4a0b-b6a3-121689aac240
+# ╟─da3729b4-fb64-47d0-ac55-a89804355a43
 # ╠═e303171b-2c22-4aae-b02f-55ab72b05ddf
 # ╠═97b02aef-36c1-4dfb-ba90-81930ee8b2eb
 # ╠═22032ef0-1a1a-4960-a6fe-fe46091a4fa5
