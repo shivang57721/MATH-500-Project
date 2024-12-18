@@ -1655,24 +1655,15 @@ md"""
 """
 
 # ╔═╡ 4cc3ded3-9c62-4af5-be73-7f52fa6ed177
-md"""
-We can not hope to use Kato temple on $H$ as $H$ has no discrete spectrum. We can use Kato temple for $H_k$ to get a reliable error bound for $\lambda_{kn}$ as a discrete spectrum, but we have to take the degeneracies into account. Also we have t o assume that we are not missing any eigenvalue $\lambda_{kn}$ so that we can have a reliable estimate for $\delta$
-"""
+# Your answer here
 
 # ╔═╡ a1c02b0d-da66-4b1a-9a4b-2a5dd7997232
 md"""
 **(b)** Assume that our numerical procedure (discretisation + diagonalisation) for all considered cutoffs is sufficiently good, such that no eigenpairs are missed. Employ the prevously discussed (e.g. Sheet 6) technique of combining Kato-Temple and Bauer-Fike estimates to obtain an improved estimate for the error in the eigenvalue. Add your estimate for the first eigenvalue at the $Γ$-point to your plot in Task 2.2 (d). What do you observe ?
 """
 
-# ╔═╡ 21632ccc-690f-4fed-9091-a9444e0a79d2
-for (ik, kpt) in enumerate(basis_one.kpoints)
-	hamk = ham_one[ik]
-	λk   = eigres_one.eigenvalues[ik]
-	Xk   = eigres_one.ψ[ik]
-
-	residual_k = hamk * Xk - Xk * Diagonal(λk)
-	println(ik, "  ", norm(residual_k))
-end
+# ╔═╡ bfdc1d7f-1899-449d-ac10-6e8b83302823
+# Your answer here
 
 # ╔═╡ 7ed09f35-a22b-47c0-9ada-e3c11a9645a8
 md"""
@@ -1895,6 +1886,13 @@ md"""
 # ╔═╡ e2ff4156-5894-4ed6-a52e-6909c5f03bf8
 md"""
 (3) Now we combine both inequalities to derive
+```math
+\begin{align}
+\langle x, S_\mu x \rangle &\geq \mathcal{E} - \|V_k^{\mathcal{E}^\perp\mathcal{E}^\perp} \|_\text{op} - \mu - \frac{\| V_k \|^2_{\text{op}}}{\widetilde{λ}_{kn} - \mu} \\
+&\geq \mathcal{E} - \mu - l_1^V - \frac{(l_1^V)^2}{\widetilde{λ}_{kn} - \mu}
+\end{align}
+```
+where $\|V_k^{\mathcal{E}^\perp\mathcal{E}^\perp} \|_\text{op} \leq \| V_k \|^2_{\text{op}} \leq l_1^V = \sum_{|G| < \sqrt{2\mathcal{E}_V}} |\hat{V}(G)|$ by Young's inequality and that $\hat{V}(G)$ is nonzero only for $|G| < \sqrt{2\mathcal{E}_V}$.
 """
 
 # ╔═╡ 5bfb143e-414b-4283-9a6a-be99452aa1b5
@@ -1917,7 +1915,61 @@ md"""
 """
 
 # ╔═╡ 10426573-4929-4576-9633-781b024bd97b
-# Your answer here
+function calculate_lower_bound(model, Ecut)
+    basis = PlaneWaveBasis(model; Ecut=Ecut, kgrid=(1, 1, 1))
+    ham = Hamiltonian(basis)
+    λ_k = diagonalize_auto(ham, 2).eigenvalues[1]
+	
+	Vreal = DFTK.total_local_potential(ham)
+	Vfourier = fft(basis, basis.kpoints[1], Complex.(Vreal[:, :, :, 1]))
+	l1_V = sum(abs, Vfourier)
+
+	# First eigenvalue
+	b = l1_V - λ_k[1] - Ecut
+	c = -l1_V^2 + λ_k[1]*Ecut - λ_k[1]*l1_V
+	Δ1 = b^2 - 4c
+	μ1 = 0.5 * (-b - sqrt(Δ1))
+	println(μ1)
+
+	# Second eigenvalue
+	b = l1_V - λ_k[2] - Ecut
+	c = -l1_V^2 + λ_k[2]*Ecut - λ_k[2]*l1_V
+	Δ2 = b^2 - 4c
+	μ2 = 0.5 * (-b - sqrt(Δ2))
+	println(μ2)
+	
+	I2_lower = 0.5*(λ_k[1] + λ_k[2])
+
+	μ_test = μ2
+	lower_bound = Ecut - μ_test - l1_V - l1_V^2 / (λ_k[2] - μ_test)
+	# print(lower_bound)
+	
+	
+
+	# # First eigenvalue
+	# μ1 = NaN
+	# for μ_test in range(λ_k[1], -10, 10)
+	# 	lower_bound = E_cut - μ_test - l1_V - l1_V^2 / (λ_k[1] - μ_test)
+	# 	if lower_bound < 0
+	# 		break
+	# 	end
+	# 	μ1 = μ_test
+	# end
+
+	# # Second eigenvalue
+	# μ2 = NaN
+	# for μ_test in range(0.5 * (λ_k[1] + λ_k[2]), λ_k[2], 10)
+	# 	lower_bound = E_cut - μ_test - l1_V - l1_V^2 / (λ_k[2] - μ_test)
+	# 	if lower_bound < 0
+	# 		break
+	# 	end
+	# 	μ2 = μ_test
+	# end
+	# return [μ1, μ2]
+end
+
+# ╔═╡ e18db268-8e9e-49e3-ae7a-d15319eb9740
+calculate_lower_bound(model, 50)
 
 # ╔═╡ 3de33cb8-c6ee-4b60-94df-2cf29afbe2d7
 md"""
@@ -2002,7 +2054,7 @@ function nonadaptive_lobpcg(model::Model{T}, Ecut, n_bands;
 		# Precondition and update
 		DFTK.precondprep!(prec, X)
 		ldiv!(prec, R)
-		P .= X - new_X
+		P = X - new_X
 		X .= new_X
 
 		# Additional step:
@@ -2073,7 +2125,20 @@ i.e. that the total error is driven to zero as the iterative diagonalisation emp
 """
 
 # ╔═╡ 3c1c0131-96fe-4fb7-ac0c-0aaec21dd023
-# Your answer here
+md"""
+The Bauer-Fike bound gives $|λ_{kn} - \widetilde{\lambda}_{kn}| \leq \|r_{kn} \|$. If $\| Q_k^\mathcal{E} \widetilde{X}_{kn}\| = 0$, then this bound can be simplified
+```math
+\begin{align}
+r_{kn}  &= P_k^\mathcal{F} r_{kn} + Q_k^\mathcal{F} r_{kn} \\
+		&= P_k^\mathcal{F} r_{kn} + Q_k^\mathcal{F} H_k \widetilde{X}_{kn} - Q_k^\mathcal{F} \widetilde{λ}_{kn} \widetilde{X}_{kn} \\
+		&= P_k^\mathcal{F} r_{kn} + Q_k^\mathcal{F} H_k P_k^\mathcal{E} \widetilde{X}_{kn} + Q_k^\mathcal{F} H_k Q_k^\mathcal{E} \widetilde{X}_{kn} \\
+		&= P_k^\mathcal{F} r_{kn}
+\end{align}
+```
+where the last equality uses $Q_k^\mathcal{E} \widetilde{X}_{kn} = 0$ and $Q_k^\mathcal{F} H_k P_k^\mathcal{E} = 0$.
+
+Based on this, if $\| Q_k^\mathcal{E} \widetilde{X}_{kn}\|$ is large relative to $\| P_k^\mathcal{F} \widetilde{r}_{kn}\|$, then by the above derivation, the residual norm $\| r_{kn} \|$ may be much larger than $\| P_k^\mathcal{F} r_{kn} \|$, meaning that we should refine the discretisation to get a more accurate error bound on the eigenvalue.
+"""
 
 # ╔═╡ 5de67497-d252-443a-8a72-8e01891aea41
 md"""
@@ -2098,8 +2163,77 @@ Whenever (5) becomes too large, you should switch to a finer discretisation basi
 - Be creative and experiment. In this Task there is no "best" solution.
 """
 
+# ╔═╡ 0d535f1b-e01a-4d6e-9800-058ae20b4d0a
+begin
+	res_nonadaptive = nonadaptive_lobpcg(model, 80, 1)
+	residual_history = res_nonadaptive.residual_history
+	plot([x[1] for x in residual_history], ylabel="residual", marker=:circle, label="ev1")
+end
+
 # ╔═╡ 8c712ee5-f076-442e-ad33-edfe5a6e6941
-# Your answer here
+function adaptive_lobpcg(model::Model{T}, Ecut, n_bands;
+                            maxiter=100, tol=1e-6, verbose=false) where {T}
+	kgrid = (1, 1, 1)  # Γ point only
+	basis = PlaneWaveBasis(model; Ecut, kgrid)
+	ham   = Hamiltonian(basis)
+	hamk  = ham[1]                   # Select Γ point
+	prec  = PreconditionerTPA(hamk)  # Initialise preconditioner
+	X     = DFTK.random_orbitals(hamk, n_bands)  # Random initial guess
+	
+	converged = false
+	λ = NaN
+	residual_norms = NaN
+	residual_history = []
+	
+	P = zero(X)
+	R = zero(X)
+	for i in 1:maxiter
+		if i > 1
+			Z = hcat(X, P, R)
+		else
+			Z = X
+		end
+		Z = Matrix(qr(Z).Q)  # QR-based orthogonalisation
+
+		# Rayleigh-Ritz
+		HZ = hamk * Z
+		λ, Y = eigen(Hermitian(Z' * HZ))
+		λ = λ[1:n_bands]
+		Y = Y[:, 1:n_bands]
+		new_X = Z * Y
+		
+		# Compute residuals and convergence check
+		R = HZ * Y - new_X * Diagonal(λ)
+		residual_norms = norm.(eachcol(R))
+		push!(residual_history, residual_norms)
+		verbose && @printf "%3i %8.4g %8.4g\n" i λ[end] residual_norms[end]
+		if maximum(residual_norms) < tol
+			converged = true
+			X .= new_X
+			break
+		end
+
+		# Precondition and update
+		DFTK.precondprep!(prec, X)
+		ldiv!(prec, R)
+		P = X - new_X
+		X .= new_X
+
+		# Additional step:
+		# Move to larger basis ?
+		X_small = transfer_blochwave(X,
+						   basis_large, basis_large.kpoints[1],
+						   basis_small, basis_small.kpoints[1])
+		P_X     = transfer_blochwave(X_small,
+						   basis_small, basis_small.kpoints[1],
+						   basis_large, basis_large.kpoints[1])
+		
+	end
+
+	# Notice that eigenvalues are returned as λ
+	# and eigenvectors as X
+	(; λ, X, basis, ham, converged, residual_norms, residual_history)
+end
 
 # ╔═╡ ee3fe129-48f8-4932-ac23-2287c6be9780
 md"""
@@ -4311,7 +4445,7 @@ version = "1.4.1+1"
 # ╟─5f0d20d1-c5f0-43b8-b65d-d5a2039cd01a
 # ╠═4cc3ded3-9c62-4af5-be73-7f52fa6ed177
 # ╟─a1c02b0d-da66-4b1a-9a4b-2a5dd7997232
-# ╠═21632ccc-690f-4fed-9091-a9444e0a79d2
+# ╠═bfdc1d7f-1899-449d-ac10-6e8b83302823
 # ╟─7ed09f35-a22b-47c0-9ada-e3c11a9645a8
 # ╠═63b1a886-6b63-4219-a941-f1a699f0d614
 # ╟─5f5f139e-57f9-4b2f-8398-a13fbe119fb5
@@ -4330,6 +4464,7 @@ version = "1.4.1+1"
 # ╟─d6e7e0d0-52d8-4306-bde0-1a55598ed6af
 # ╟─d4792fec-7762-4c2b-9be8-3c6c6791bd3d
 # ╠═10426573-4929-4576-9633-781b024bd97b
+# ╠═e18db268-8e9e-49e3-ae7a-d15319eb9740
 # ╟─3de33cb8-c6ee-4b60-94df-2cf29afbe2d7
 # ╟─2c6f639e-fbf2-4d9a-a0dd-4306f0b92a8d
 # ╠═f0b9d21b-dc78-4d95-ac47-5a19f41c0fd4
@@ -4340,8 +4475,9 @@ version = "1.4.1+1"
 # ╠═7ebc18b0-618f-4d99-881f-7c30eb3bc7f5
 # ╟─bf00ec9d-5c69-43c3-87c1-28ac9f5b4c9f
 # ╟─9430a871-0f8f-4ee2-b574-f818f1580abd
-# ╠═3c1c0131-96fe-4fb7-ac0c-0aaec21dd023
+# ╟─3c1c0131-96fe-4fb7-ac0c-0aaec21dd023
 # ╟─5de67497-d252-443a-8a72-8e01891aea41
+# ╠═0d535f1b-e01a-4d6e-9800-058ae20b4d0a
 # ╠═8c712ee5-f076-442e-ad33-edfe5a6e6941
 # ╟─ee3fe129-48f8-4932-ac23-2287c6be9780
 # ╟─b61a9e8c-e7b4-4e5e-8b4a-10e939c164a9
