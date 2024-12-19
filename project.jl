@@ -1313,11 +1313,11 @@ It suffices to show
 ```math
 H_k \widetilde{X}_{kn} = H_k^{\mathcal{F} \mathcal{F}} \widetilde{X}_{kn}
 ```
-for some $\mathcal{F}$ large enough. Recall $\widetilde{X}_{kn}$ was computed in the plane-wave basis $\mathbb{B}_k^\mathcal{E}$. By (1), we know that if $e_G \in \mathbb{B}_k^\mathcal{E}$ and $|\Delta G| > \sqrt{2 \mathcal{E}_V}$ then $\langle e_{G + \Delta G} | H_k e_{G} \rangle = 0$, so
+for some $\mathcal{F}$ large enough. Recall $\widetilde{X}_{kn}$ was computed in the plane-wave basis $\mathbb{B}_k^\mathcal{E}$. By (1), we know that if $e_G \in \mathbb{B}_k^\mathcal{E}$ and $|\Delta G| > \sqrt{2 \mathcal{E}_V}$ then $\langle e_{G + \Delta G} | H_k e_{G} \rangle = 0$, so in particular
 ```math
-\langle e_{G + \Delta G} | H_k \widetilde{X}_{kn} \rangle = 0
+\langle e_{G + \Delta G} | H_k \widetilde{X}_{kn} \rangle = 0.
 ```
-so we can take $\mathcal{F} = \mathcal{E} + \mathcal{E}_V$, because then if $e_G \not\in \mathbb{B}_k^\mathcal{F}$, then $\frac{1}{2} |G + k|^2 \geq \mathcal{E} + \mathcal{E}_V$ and so $G$ can be written as $G = G' + \Delta G$ for some $e_{G'} \in \mathbb{B}_k^\mathcal{E}$ and $|\Delta G| > \sqrt{2 \mathcal{E} V}$. Thus, $H_k \widetilde{X}_{kn}$ can be expressed entirely in the basis $\mathbb{B}_k^\mathcal{F}$ and so
+Therefore, in order to find $\mathcal{F}$, we need to prove that if $\frac{1}{2} |G + k|^2 > \mathcal{F}$ and $\frac{1}{2} |G' + k|^2 \leq \mathcal{E}$ then $|G - G'| > \sqrt{2\mathcal{E}_V}$. Solving for this system of inequalities gives the solution $\sqrt{\mathcal{F}} = \sqrt{\mathcal{E}} + \sqrt{\mathcal{E}_V}$. Thus, $H_k \widetilde{X}_{kn}$ can be expressed entirely in the basis $\mathbb{B}_k^\mathcal{F}$ and so
 ```math
 H_k \widetilde{X}_{kn} = H_k^{\mathcal{F} \mathcal{F}} \widetilde{X}_{kn}
 ```
@@ -1338,133 +1338,63 @@ md"""
 https://www.fisica.uniud.it/~giannozz/Corsi/MQ/LectureNotes/cohenbergstresser.pdf
 """
 
-# ╔═╡ 06e1f7f3-ea56-43dd-8c4b-fe5191d32755
-# Function to compute residue based on e_cut and F
-function compute_residue(e_cut, F, model)
-    # Define PlaneWaveBasis with the given energy cutoff
-    basis_small = PlaneWaveBasis(model; Ecut=e_cut, kgrid=(1, 1, 1))
-    
-    # Define Hamiltonian based on the energy cutoff
-    ham_small = Hamiltonian(basis_small)
-    
-    # Solve the eigenvalue problem for 1 band
-    eigres_small = diagonalize_auto(ham_small, 1)
-    X_small=eigres_small.ψ
-	eigen_small=eigres_small.eigenvalues[1]
-	
-    # Compute the "mapped" residue for the higher cutoff F
-    basis_large = PlaneWaveBasis(model; Ecut=F, kgrid=(1, 1, 1))
-    ham_large = Hamiltonian(basis_large)
-	#X_large_mapped = transfer_blochwave(X_small, basis_small, basis_large)
-
-	# Solve the eigenvalue problem for 1 band with higher cutoff
-    eigres_large = diagonalize_auto(ham_large, 1)
-    X_large=eigres_large.ψ
-	eigen_large=eigres_large.eigenvalues[1]
-	
-    # Residual calculation (difference in the eigenvalue energies)
-    residual_small = ham_small * X_small#-eigen_small.*X_small
-	residual_small_map = transfer_blochwave(X_small, basis_small, basis_large)
-	residual_large = ham_large * X_large#-eigen_large.*X_large
-
-	residual_diff = norm(residual_large-residual_small_map)
-	e_v = F - e_cut
-    return residual_diff, e_v
-end
-
-# ╔═╡ b70a1c21-ec54-4080-b599-dba2b2816c14
-function compute_projected_residual(model, E_cut, F, bands)
-    basis_small = PlaneWaveBasis(model; Ecut=E_cut, kgrid=(1, 1, 1))
-    ham_small = Hamiltonian(basis_small)
-    
-    eigres_small = diagonalize_auto(ham_small, bands)
-    X_small = eigres_small.ψ[1]
-	λ_k = eigres_small.eigenvalues[1]
-	
-    basis_large = PlaneWaveBasis(model; Ecut=F, kgrid=(1, 1, 1))
-    ham_large = Hamiltonian(basis_large)
-	
-	X_large = transfer_blochwave_kpt(X_small, basis_small, basis_small.kpoints[1], basis_large, basis_large.kpoints[1])
-	residual = ham_large[1] * X_large - X_large .* λ_k'
-	
-    return mapslices(norm, residual; dims=1)
-end
-
 # ╔═╡ 6c43ae48-fdbb-4a0b-b6a3-121689aac240
-begin
-	E_cut_values = 10:1:15
-	plot_Ecut = plot(size=(800, 1000), layout=@layout [a; b])
+let
+	E_cut_values = 10:1:20
 
-	# Add the subplots
-	plot!(yaxis=:log, subplot=1, xlabel="F - E_cut", ylabel="diff(residual)", title="Eigenvalue #1")
-	plot!(yaxis=:log, subplot=2, xlabel="F - E_cut", ylabel="diff(residual)", title="Eigenvalue #2")
+	bands = 1
+	basis_ref = PlaneWaveBasis(model; Ecut=80, kgrid=(1, 1, 1))
+	ham_ref = Hamiltonian(basis_ref)
+
+	F_numeric = []
+	E_V_calc = []
 	
 	for E_cut in E_cut_values
-		F_values = (E_cut+1):1:(E_cut+15)
-		residuals = zeros(length(F_values), 2)
+		F_values = (E_cut+1):1:(E_cut+20)
+		residuals = zeros(length(F_values), bands)
+
+
+		basis_small = PlaneWaveBasis(model; Ecut=E_cut, kgrid=(1, 1, 1))
+	    ham_small = Hamiltonian(basis_small)
+	    
+	    eigres_small = diagonalize_auto(ham_small, bands)
+	    X_small = eigres_small.ψ[1]
+		λ_k = eigres_small.eigenvalues[1]
+
+		X_ref = transfer_blochwave_kpt(X_small, basis_small, basis_small.kpoints[1], basis_ref, basis_ref.kpoints[1])
+		residual_ref = ham_ref[1] * X_ref - X_ref .* λ_k'
+		residual_ref = mapslices(norm, residual_ref; dims=1)
+		
 		for (i, F) in enumerate(F_values)
-			residuals[i, :] = compute_projected_residual(model, E_cut, F, 2)
+			basis_large = PlaneWaveBasis(model; Ecut=F, kgrid=(1, 1, 1))
+		    ham_large = Hamiltonian(basis_large)
+			
+			X_large = transfer_blochwave_kpt(X_small, basis_small, basis_small.kpoints[1], basis_large, basis_large.kpoints[1])
+			residual = ham_large[1] * X_large - X_large .* λ_k'
+			residual = mapslices(norm, residual; dims=1)
+			
+			residuals[i, :] = abs.(residual - residual_ref)
+			
+			if residuals[i, 1] < eps(Float64)
+				push!(F_numeric, F)
+				push!(E_V_calc, (sqrt(F) - sqrt(E_cut))^2)
+				break
+			end
 		end
-
-		filtered_diff1 = diff(residuals[:, 1])[diff(residuals[:, 1]) .> 0]
-		filtered_diff2 = diff(residuals[:, 2])[diff(residuals[:, 2]) .> 0]
-
-		plot!(filtered_diff1, subplot=1, label="Ecut=$E_cut", marker=:circle)
-		plot!(filtered_diff2, subplot=2, label="Ecut=$E_cut", marker=:circle)
 	end
-	plot_Ecut
+	
+	plot(E_cut_values, F_numeric, xlabel="Ecut", ylabel="First F when no discretisation error", marker=:circle, label="Numeric Calculation")
+	
+	E_V = round(maximum(E_V_calc), digits=3)
+	F_theory = (sqrt(E_V) .+ sqrt.(E_cut_values)).^2
+	plot!(E_cut_values, F_theory, marker=:circle, label="E_V=$E_V Calculation")
 end
 
 
 # ╔═╡ da3729b4-fb64-47d0-ac55-a89804355a43
 md"""
-Based on the plot above, a reasonable estimate for $\mathcal{E}_V = \mathcal{F} - \mathcal{E}$ is $\mathcal{E}_V = 10$, since this is roughly the point where the pairwise difference in the projected residual reaches machine precision.
+Based on the theory and the plot, we estimate $\mathcal{E}_V = 2.256$
 """
-
-# ╔═╡ e303171b-2c22-4aae-b02f-55ab72b05ddf
-# begin
-# 	# Define ranges for e_cut and F
-# 	e_cuts = 5:5:20   # Energy cutoffs from 5 to 30 in steps of 5
-# 	F_values = 30:10:50  # F values from 60 to 100 in steps of 10
-	
-# 	# Arrays to store results
-# 	residual_diffs = Float64[]
-# 	e_vs = Float64[]
-# 	Fs = Int[]  # Array to store corresponding F values
-# end
-
-# ╔═╡ 97b02aef-36c1-4dfb-ba90-81930ee8b2eb
-# # Loop over e_cuts and F_values
-# for e_cut in e_cuts
-#     for F in F_values
-#         if F > e_cut  # Ensure F is greater than e_cut
-#             residual_diff, e_v = compute_residue(e_cut, F, model)
-#             push!(residual_diffs, residual_diff)
-#             push!(e_vs, e_v)
-# 			push!(Fs, F)  # Store F value
-#         end
-#     end
-# end
-
-# ╔═╡ 22032ef0-1a1a-4960-a6fe-fe46091a4fa5
-# begin
-# 	# Plot the results
-# 	unique_Fs = unique(Fs)  # Unique F values for grouping
-# 	plot()
-	
-# 	# Add scatter plots for each F value with its own color
-# 	for F in unique_Fs
-# 	    idx = findall(Fs .== F)  # Indices where F matches
-# 	    scatter!(e_vs[idx], residual_diffs[idx], label="F = $F", 
-# 	             xlabel="e_v (F - e_cut)", 
-# 	             ylabel="norm(H^e*X_e-H^F*H_F)", title="Residual Difference vs Energy Difference")
-# 	end
-	
-# 	# Finalize the plot with legend
-# 	plot!(legend=:bottomleft)
-# end
-
-# #To me the norm is so high (in the range of vector size), however, I tried to calculate the residue with eigen value, the difference in norm is always 1
 
 # ╔═╡ d26fec73-4416-4a20-bdf3-3a4c8ea533d1
 md"""
@@ -2051,43 +1981,18 @@ function calculate_lower_bound(model, Ecut)
 	c = -l1_V^2 + λ_k[1]*Ecut - λ_k[1]*l1_V
 	Δ1 = b^2 - 4c
 	μ1 = 0.5 * (-b - sqrt(Δ1))
-	println(μ1)
+	println("Solution μ1: $μ1")
 
 	# Second eigenvalue
 	b = l1_V - λ_k[2] - Ecut
 	c = -l1_V^2 + λ_k[2]*Ecut - λ_k[2]*l1_V
 	Δ2 = b^2 - 4c
 	μ2 = 0.5 * (-b - sqrt(Δ2))
-	println(μ2)
+	println("Solution μ2: $μ2")
 	
 	I2_lower = 0.5*(λ_k[1] + λ_k[2])
-
-	μ_test = μ2
-	lower_bound = Ecut - μ_test - l1_V - l1_V^2 / (λ_k[2] - μ_test)
-	# print(lower_bound)
-	
-	
-
-	# # First eigenvalue
-	# μ1 = NaN
-	# for μ_test in range(λ_k[1], -10, 10)
-	# 	lower_bound = E_cut - μ_test - l1_V - l1_V^2 / (λ_k[1] - μ_test)
-	# 	if lower_bound < 0
-	# 		break
-	# 	end
-	# 	μ1 = μ_test
-	# end
-
-	# # Second eigenvalue
-	# μ2 = NaN
-	# for μ_test in range(0.5 * (λ_k[1] + λ_k[2]), λ_k[2], 10)
-	# 	lower_bound = E_cut - μ_test - l1_V - l1_V^2 / (λ_k[2] - μ_test)
-	# 	if lower_bound < 0
-	# 		break
-	# 	end
-	# 	μ2 = μ_test
-	# end
-	# return [μ1, μ2]
+	λ2 = λ_k[2]
+	println("Interval: ($I2_lower, $λ2)")
 end
 
 # ╔═╡ e18db268-8e9e-49e3-ae7a-d15319eb9740
@@ -2287,20 +2192,24 @@ Whenever (5) becomes too large, you should switch to a finer discretisation basi
 
 # ╔═╡ 0d535f1b-e01a-4d6e-9800-058ae20b4d0a
 begin
-	res_nonadaptive = nonadaptive_lobpcg(model, 80, 1)
-	residual_history = res_nonadaptive.residual_history
-	plot([x[1] for x in residual_history], ylabel="residual", marker=:circle, label="ev1")
+	res_nonadaptive = nonadaptive_lobpcg(model, 15, 1)
+	RH = hcat(res_nonadaptive.residual_history...)'
+	plot(yaxis=:log, RH, ylabel="residual", marker=:circle, label="ev1")
 end
 
 # ╔═╡ 8c712ee5-f076-442e-ad33-edfe5a6e6941
 function adaptive_lobpcg(model::Model{T}, Ecut, n_bands;
                             maxiter=100, tol=1e-6, verbose=false) where {T}
 	kgrid = (1, 1, 1)  # Γ point only
-	basis = PlaneWaveBasis(model; Ecut, kgrid)
+	basis = PlaneWaveBasis(model; Ecut=Ecut, kgrid)
 	ham   = Hamiltonian(basis)
 	hamk  = ham[1]                   # Select Γ point
 	prec  = PreconditionerTPA(hamk)  # Initialise preconditioner
 	X     = DFTK.random_orbitals(hamk, n_bands)  # Random initial guess
+
+	Esmall = floor((sqrt(Ecut) - sqrt(2.26))^2) # Using estimate E_V = 2.26
+	basis_small = PlaneWaveBasis(model; Ecut=Esmall, kgrid)
+	hamk_small  = Hamiltonian(basis_small)[1]    
 	
 	converged = false
 	λ = NaN
@@ -2343,18 +2252,55 @@ function adaptive_lobpcg(model::Model{T}, Ecut, n_bands;
 
 		# Additional step:
 		# Move to larger basis ?
-		X_small = transfer_blochwave(X,
-						   basis_large, basis_large.kpoints[1],
+		X_small = transfer_blochwave_kpt(X,
+						   basis, basis.kpoints[1],
 						   basis_small, basis_small.kpoints[1])
-		P_X     = transfer_blochwave(X_small,
+		P_X     = transfer_blochwave_kpt(X_small,
 						   basis_small, basis_small.kpoints[1],
-						   basis_large, basis_large.kpoints[1])
+						   basis, basis.kpoints[1])
+
+		Q_X = X - P_X
+		println(norm(Q_X))
+		println(norm(R))
 		
+		if norm(Q_X) / norm(R) > 1
+			# Change basis
+			Ecut   += 10
+			Esmall = floor((sqrt(Ecut) - sqrt(2.256))^2)
+			
+			new_basis = PlaneWaveBasis(model; Ecut=Ecut, kgrid)
+			new_ham   = Hamiltonian(new_basis)
+			new_hamk  = new_ham[1]
+			prec      = PreconditionerTPA(new_hamk)
+			
+			X = transfer_blochwave_kpt(X,
+						   basis, basis.kpoints[1],
+						   new_basis, new_basis.kpoints[1])
+			P = transfer_blochwave_kpt(P,
+						   basis, basis.kpoints[1],
+						   new_basis, new_basis.kpoints[1])
+			R = transfer_blochwave_kpt(R,
+						   basis, basis.kpoints[1],
+						   new_basis, new_basis.kpoints[1])
+			
+			basis = new_basis
+			ham   = new_ham
+			hamk  = new_hamk
+		end
 	end
 
 	# Notice that eigenvalues are returned as λ
 	# and eigenvectors as X
+	println(Ecut)
+	println()
 	(; λ, X, basis, ham, converged, residual_norms, residual_history)
+end
+
+# ╔═╡ 1d1b7bd7-6673-431e-8802-29cd257d0e69
+begin
+	res_adaptive = adaptive_lobpcg(model, 15, 1)
+	RH_adaptive = hcat(res_adaptive.residual_history...)'
+	plot(yaxis=:log, RH_adaptive, ylabel="residual", marker=:circle, label="ev1")
 end
 
 # ╔═╡ ee3fe129-48f8-4932-ac23-2287c6be9780
@@ -4498,13 +4444,8 @@ version = "1.4.1+1"
 # ╟─83b6b542-0eb1-4ff7-bea6-26466af478f5
 # ╟─abdfcc43-245d-425a-809e-d668f03e9b45
 # ╟─ceb72ee7-f7ac-4a49-a585-78e1d55cde2a
-# ╠═06e1f7f3-ea56-43dd-8c4b-fe5191d32755
-# ╠═b70a1c21-ec54-4080-b599-dba2b2816c14
 # ╠═6c43ae48-fdbb-4a0b-b6a3-121689aac240
 # ╟─da3729b4-fb64-47d0-ac55-a89804355a43
-# ╠═e303171b-2c22-4aae-b02f-55ab72b05ddf
-# ╠═97b02aef-36c1-4dfb-ba90-81930ee8b2eb
-# ╠═22032ef0-1a1a-4960-a6fe-fe46091a4fa5
 # ╟─d26fec73-4416-4a20-bdf3-3a4c8ea533d1
 # ╠═b1270539-8079-4761-ab61-55d08d563635
 # ╠═ac3f6914-d476-4ddf-8ff7-3801bba7f2df
@@ -4572,6 +4513,7 @@ version = "1.4.1+1"
 # ╟─5de67497-d252-443a-8a72-8e01891aea41
 # ╠═0d535f1b-e01a-4d6e-9800-058ae20b4d0a
 # ╠═8c712ee5-f076-442e-ad33-edfe5a6e6941
+# ╠═1d1b7bd7-6673-431e-8802-29cd257d0e69
 # ╟─ee3fe129-48f8-4932-ac23-2287c6be9780
 # ╟─b61a9e8c-e7b4-4e5e-8b4a-10e939c164a9
 # ╟─ea9b6c1b-e2dd-4c68-82ca-b63ada51cfd1
