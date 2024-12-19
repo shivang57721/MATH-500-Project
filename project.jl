@@ -1035,7 +1035,7 @@ First equality:
 	&= \delta_{G G'}
 \end{align*}
 ```
-since $e^{i G \cdot x}|_{\delta \Omega}$ is constant.
+since $e^{i G \cdot x}$ is periodic on the boundary of $\Omega$.
 Second equality:
 ```math
 \begin{align*}
@@ -1658,7 +1658,9 @@ md"""
 """
 
 # ╔═╡ 4cc3ded3-9c62-4af5-be73-7f52fa6ed177
-# Your answer here
+md"""
+In lecture 10 on periodic problems, we studied the spectral properties of the Bloch fibers $H_k$. In particular, we learnt that $H_k$ is a self-adjoint and bounded below operator on the bounded domain $\Omega$ and has compact resolvent. Having compact resolvent implies that the spectrum of $H_k$ is discrete, meaning that each eigenvalue $\lambda_{kn}$ is isolated and has finite multiplicity. Thus, by Theorem 8 of lecture 10, the Kato-Temple bound can be applied. 
+"""
 
 # ╔═╡ a1c02b0d-da66-4b1a-9a4b-2a5dd7997232
 md"""
@@ -4557,7 +4559,7 @@ version = "1.4.1+2"
 # ╠═f3d70415-29ee-41ad-b57a-38a074a5aaf8
 # ╟─d7f3cadf-6161-41ce-8a7a-20fba5182cfb
 # ╟─5f0d20d1-c5f0-43b8-b65d-d5a2039cd01a
-# ╠═4cc3ded3-9c62-4af5-be73-7f52fa6ed177
+# ╟─4cc3ded3-9c62-4af5-be73-7f52fa6ed177
 # ╟─a1c02b0d-da66-4b1a-9a4b-2a5dd7997232
 # ╠═bfdc1d7f-1899-449d-ac10-6e8b83302823
 # ╟─7ed09f35-a22b-47c0-9ada-e3c11a9645a8
