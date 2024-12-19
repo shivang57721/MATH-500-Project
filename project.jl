@@ -1378,11 +1378,12 @@ let
 		end
 	end
 	
-	plot(E_cut_values, F_numeric, xlabel="Ecut", ylabel="First F when no discretisation error", marker=:circle, label="Numeric Calculation")
+	plot(E_cut_values, F_numeric, xlabel="Ecut", ylabel="F with no discretisation error", marker=:circle, label="Numeric Calculation")
 	
 	E_V = round(maximum(E_V_calc), digits=3)
 	F_theory = (sqrt(E_V) .+ sqrt.(E_cut_values)).^2
 	plot!(E_cut_values, F_theory, marker=:circle, label="E_V=$E_V Calculation")
+	title!("Relationship between Ecut and F")
 end
 
 
@@ -2017,6 +2018,13 @@ end
 # ╔═╡ 56a0ead4-72fc-4ce5-935c-cea39892a921
 md"""
 There does not exist a guaranteed lower bound for the second eigenvalue at the $Γ$ point.
+
+Advantages of guaranteed error bounds:
+- Accuracy and reliability of computed eigenvalues
+- Can suggest when further computation is needed for precision
+Disadvantages of guaranteed error bounds:
+- Increased computational overhead
+- Overly conservative bounds
 """
 
 # ╔═╡ 3de33cb8-c6ee-4b60-94df-2cf29afbe2d7
