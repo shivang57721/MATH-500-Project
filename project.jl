@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.3
+# v0.20.0
 
 using Markdown
 using InteractiveUtils
@@ -41,11 +41,6 @@ md"""
 
 # ╔═╡ f09f563c-e458-480f-92be-355ab4582fb5
 TableOfContents()
-
-# ╔═╡ 3de7dfe4-032b-4e05-a929-5ffabfbb35cc
-md"""
-Hi my name is Bardia
-"""
 
 # ╔═╡ c17073d6-94e2-464f-acff-6f444bf7d08c
 md"""
@@ -1252,8 +1247,8 @@ eigen_diff_abs = abs.(eigen_diff)
 # ╔═╡ e0c6e8d3-4f0a-4be6-805f-79fb012c01d8
 begin
 	# Plot the results
-	plot(Ecut_values, eigen_diff_abs[:, 1], label="First Eigenvalue", yaxis=:log)
-	plot!(Ecut_values, eigen_diff_abs[:, 2], label="Second Eigenvalue", yaxis=:log)
+	plot(Ecut_values, eigen_diff_abs[:, 1], label="First Eigenvalue", marker=:circle, yaxis=:log)
+	plot!(Ecut_values, eigen_diff_abs[:, 2], label="Second Eigenvalue", marker=:circle, yaxis=:log)
 	xlabel!("Ecut")
 	ylabel!("Eigenvalue Difference to Reference")
 	title!("Eigenvalues vs. Ecut")
@@ -1393,7 +1388,8 @@ end
 
 # ╔═╡ da3729b4-fb64-47d0-ac55-a89804355a43
 md"""
-Based on the theory and the plot, we estimate $\mathcal{E}_V = 2.256$
+We compute the first value of $\mathcal{F}$ where the discretisation error is $0$ numerically for various values of $\mathcal{E}$. Part (b) shows that the relationship is $\sqrt{\mathcal{F}} = \sqrt{\mathcal{E}} + \sqrt{\mathcal{E}_V}$. 
+Based on the numerical data, we make the estimate $\mathcal{E}_V = 2.256$ by solving for the maximum of $\mathcal{E}_V$ over the various data points.
 """
 
 # ╔═╡ d26fec73-4416-4a20-bdf3-3a4c8ea533d1
@@ -1916,6 +1912,7 @@ md"""
 \end{align*}
 ```
 where $\langle e_G | Q_k^{\mathcal{E}^\perp} V e_G\rangle \geq - \|V_k^{\mathcal{E}^\perp\mathcal{E}^\perp} \|_\text{op}$ follows from definition.
+Then, by linearity of the inner product, the inequality also holds for $x \in X$ with norm $1$.
 """
 
 # ╔═╡ d5de7b64-db19-48cf-81e4-d1f48c6ed08b
@@ -1933,6 +1930,7 @@ md"""
 &= \frac{\| V_k \|^2_{\text{op}}}{\widetilde{λ}_{kn} - \mu}
 \end{align}
 ```
+where we use that $V_k^{\mathcal{E}^\perp\mathcal{E}} = V_k^{\mathcal{R}\mathcal{E}}$ since $V$ is bounded in the fourier domain and $(V_k^{\mathcal{E}\mathcal{E}^\perp})^H = V_k^{\mathcal{R} \mathcal{E}}$ by the self-adjointness of $V$ and projections.
 """
 
 # ╔═╡ e2ff4156-5894-4ed6-a52e-6909c5f03bf8
@@ -1981,22 +1979,45 @@ function calculate_lower_bound(model, Ecut)
 	c = -l1_V^2 + λ_k[1]*Ecut - λ_k[1]*l1_V
 	Δ1 = b^2 - 4c
 	μ1 = 0.5 * (-b - sqrt(Δ1))
-	println("Solution μ1: $μ1")
+	λ1 = λ_k[1]
 
 	# Second eigenvalue
 	b = l1_V - λ_k[2] - Ecut
 	c = -l1_V^2 + λ_k[2]*Ecut - λ_k[2]*l1_V
 	Δ2 = b^2 - 4c
 	μ2 = 0.5 * (-b - sqrt(Δ2))
-	println("Solution μ2: $μ2")
 	
 	I2_lower = 0.5*(λ_k[1] + λ_k[2])
-	λ2 = λ_k[2]
-	println("Interval: ($I2_lower, $λ2)")
+	if (μ2 < I2_lower) || (μ2 > λ_k[2])
+		μ2 = NaN
+	end
+
+	return μ1, μ2
 end
 
 # ╔═╡ e18db268-8e9e-49e3-ae7a-d15319eb9740
-calculate_lower_bound(model, 50)
+let
+	basis = PlaneWaveBasis(model; Ecut=80, kgrid=(1, 1, 1))
+    ham = Hamiltonian(basis)
+    λ = diagonalize_auto(ham, 2).eigenvalues[1]
+
+	μ1_lower_bounds = []
+	μ2_lower_bounds = []
+	Ecut_values = 10:5:80
+	for Ecut in Ecut_values
+		μ1, μ2 = calculate_lower_bound(model, Ecut)
+		push!(μ1_lower_bounds, μ1)
+		push!(μ2_lower_bounds, μ2)
+	end
+	plot(Ecut_values, μ1_lower_bounds, marker=:circle, xlabel="Ecut", ylabel="Value", label="μ1 guaranteed lower bound")
+	hline!([λ[1]], linestyle=:dash, label="Reference eigenvalue λ1")
+	title!("Guaranteed Lower bound for eigenvalue 1")
+end
+
+# ╔═╡ 56a0ead4-72fc-4ce5-935c-cea39892a921
+md"""
+There does not exist a guaranteed lower bound for the second eigenvalue at the $Γ$ point.
+"""
 
 # ╔═╡ 3de33cb8-c6ee-4b60-94df-2cf29afbe2d7
 md"""
@@ -2164,7 +2185,7 @@ r_{kn}  &= P_k^\mathcal{F} r_{kn} + Q_k^\mathcal{F} r_{kn} \\
 ```
 where the last equality uses $Q_k^\mathcal{E} \widetilde{X}_{kn} = 0$ and $Q_k^\mathcal{F} H_k P_k^\mathcal{E} = 0$.
 
-Based on this, if $\| Q_k^\mathcal{E} \widetilde{X}_{kn}\|$ is large relative to $\| P_k^\mathcal{F} \widetilde{r}_{kn}\|$, then by the above derivation, the residual norm $\| r_{kn} \|$ may be much larger than $\| P_k^\mathcal{F} r_{kn} \|$, meaning that we should refine the discretisation to get a more accurate error bound on the eigenvalue.
+Based on this, if $\| Q_k^\mathcal{E} \widetilde{X}_{kn}\|$ is large relative to $\| P_k^\mathcal{F} \widetilde{r}_{kn}\|$, then the full residual is mostly caused by discretisation error, so we should refine the discretisation to get a more accurate error bound on the eigenvalue.
 """
 
 # ╔═╡ 5de67497-d252-443a-8a72-8e01891aea41
@@ -2190,13 +2211,6 @@ Whenever (5) becomes too large, you should switch to a finer discretisation basi
 - Be creative and experiment. In this Task there is no "best" solution.
 """
 
-# ╔═╡ 0d535f1b-e01a-4d6e-9800-058ae20b4d0a
-begin
-	res_nonadaptive = nonadaptive_lobpcg(model, 15, 1)
-	RH = hcat(res_nonadaptive.residual_history...)'
-	plot(yaxis=:log, RH, ylabel="residual", marker=:circle, label="ev1")
-end
-
 # ╔═╡ 8c712ee5-f076-442e-ad33-edfe5a6e6941
 function adaptive_lobpcg(model::Model{T}, Ecut, n_bands;
                             maxiter=100, tol=1e-6, verbose=false) where {T}
@@ -2207,7 +2221,7 @@ function adaptive_lobpcg(model::Model{T}, Ecut, n_bands;
 	prec  = PreconditionerTPA(hamk)  # Initialise preconditioner
 	X     = DFTK.random_orbitals(hamk, n_bands)  # Random initial guess
 
-	Esmall = floor((sqrt(Ecut) - sqrt(2.26))^2) # Using estimate E_V = 2.26
+	Esmall = floor((sqrt(Ecut) - sqrt(2.256))^2) # Using estimate E_V = 2.256
 	basis_small = PlaneWaveBasis(model; Ecut=Esmall, kgrid)
 	hamk_small  = Hamiltonian(basis_small)[1]    
 	
@@ -2218,6 +2232,7 @@ function adaptive_lobpcg(model::Model{T}, Ecut, n_bands;
 	
 	P = zero(X)
 	R = zero(X)
+	E_values = [Ecut]
 	for i in 1:maxiter
 		if i > 1
 			Z = hcat(X, P, R)
@@ -2260,12 +2275,11 @@ function adaptive_lobpcg(model::Model{T}, Ecut, n_bands;
 						   basis, basis.kpoints[1])
 
 		Q_X = X - P_X
-		println(norm(Q_X))
-		println(norm(R))
+		ratio = maximum(norm.(eachcol(Q_X)) ./ norm.(eachcol(R)))
 		
-		if norm(Q_X) / norm(R) > 1
+		if (ratio > 1e7) && (Ecut < 80)
 			# Change basis
-			Ecut   += 10
+			Ecut = min(Ecut+20, 80)
 			Esmall = floor((sqrt(Ecut) - sqrt(2.256))^2)
 			
 			new_basis = PlaneWaveBasis(model; Ecut=Ecut, kgrid)
@@ -2287,21 +2301,37 @@ function adaptive_lobpcg(model::Model{T}, Ecut, n_bands;
 			ham   = new_ham
 			hamk  = new_hamk
 		end
+		push!(E_values, Ecut)
 	end
 
 	# Notice that eigenvalues are returned as λ
 	# and eigenvectors as X
-	println(Ecut)
-	println()
-	(; λ, X, basis, ham, converged, residual_norms, residual_history)
+	(; λ, X, basis, ham, converged, residual_norms, residual_history, E_values)
 end
 
 # ╔═╡ 1d1b7bd7-6673-431e-8802-29cd257d0e69
 begin
-	res_adaptive = adaptive_lobpcg(model, 15, 1)
+	res_nonadaptive = nonadaptive_lobpcg(model, 80, 2; tol=1e-8)
+	RH = hcat(res_nonadaptive.residual_history...)'
+	plot(yaxis=:log, xlabel="Iterations", ylabel="residual")
+	plot!(RH[:, 1], marker=:circle, label="EV1 reference")
+	plot!(RH[:, 2], marker=:circle, label="EV2 reference")
+	
+	res_adaptive = adaptive_lobpcg(model, 10, 2; tol=1e-8)
 	RH_adaptive = hcat(res_adaptive.residual_history...)'
-	plot(yaxis=:log, RH_adaptive, ylabel="residual", marker=:circle, label="ev1")
+	plot!(RH_adaptive[:, 1], marker=:circle, label="EV1 adaptive")
+	plot!(RH_adaptive[:, 2], marker=:circle, label="EV2 adaptive")
+	title!("Residual plot for first two eigenvalues")
+	
 end
+
+# ╔═╡ bee97b01-7205-4b2c-8ab2-8af285f8b8f9
+plot(res_adaptive.E_values, xlabel="Iterations", ylabel="Ecut values", marker=:circle, title="Ecut values for adaptive lobpcg")
+
+# ╔═╡ 87ae5e00-2bb7-433f-8f77-1097fe37b347
+md"""
+By trial and error, I estimated a good ratio threshold to be $1e7$ and $Δ=20$.
+"""
 
 # ╔═╡ ee3fe129-48f8-4932-ac23-2287c6be9780
 md"""
@@ -2359,14 +2389,14 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 [compat]
 BenchmarkTools = "~1.5.0"
 Brillouin = "~0.5.19"
-DFTK = "~0.6.20"
-DoubleFloats = "~1.4.0"
+DFTK = "~0.7.3"
+DoubleFloats = "~1.4.2"
 Interpolations = "~0.15.1"
 LimitedLDLFactorizations = "~0.5.1"
 LinearMaps = "~3.11.3"
-Plots = "~1.40.5"
+Plots = "~1.40.9"
 PlutoTeachingTools = "~0.3.1"
-PlutoUI = "~0.7.59"
+PlutoUI = "~0.7.60"
 Preconditioners = "~0.6.1"
 """
 
@@ -2374,9 +2404,9 @@ Preconditioners = "~0.6.1"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.5"
+julia_version = "1.11.2"
 manifest_format = "2.0"
-project_hash = "2d6543ada21efab3f23b8bbe6946377167fea569"
+project_hash = "ff9f1d3f2cdd7374cfdd8e5f8b8bed07bc20d233"
 
 [[deps.AMD]]
 deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse_jll"]
@@ -2450,7 +2480,7 @@ version = "1.1.3"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
-version = "1.1.1"
+version = "1.1.2"
 
 [[deps.ArrayInterface]]
 deps = ["Adapt", "LinearAlgebra"]
@@ -2486,12 +2516,19 @@ version = "7.18.0"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
+version = "1.11.0"
 
 [[deps.AtomsBase]]
-deps = ["LinearAlgebra", "PeriodicTable", "Printf", "Requires", "StaticArrays", "Unitful", "UnitfulAtomic"]
-git-tree-sha1 = "995c2b6b17840cd87b722ce9c6cdd72f47bab545"
+deps = ["LinearAlgebra", "PeriodicTable", "Preferences", "Printf", "Requires", "StaticArrays", "Unitful", "UnitfulAtomic"]
+git-tree-sha1 = "5a664c2cf30933f1e724e7b591c2ac117380b28f"
 uuid = "a963bdd2-2df7-4f54-a1ee-49d51e6be12a"
-version = "0.3.5"
+version = "0.5.0"
+
+    [deps.AtomsBase.extensions]
+    AtomsBaseAtomsViewExt = "AtomsView"
+
+    [deps.AtomsBase.weakdeps]
+    AtomsView = "ee286e10-dd2d-4ff2-afcb-0a3cd50c8041"
 
 [[deps.AtomsCalculators]]
 deps = ["AtomsBase", "Compat", "StaticArrays", "Test", "Unitful"]
@@ -2507,6 +2544,7 @@ version = "1.1.0"
 
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
+version = "1.11.0"
 
 [[deps.BenchmarkTools]]
 deps = ["JSON", "Logging", "Printf", "Profile", "Statistics", "UUIDs"]
@@ -2714,14 +2752,15 @@ uuid = "80545937-1184-4bc9-b283-396e91386b5c"
 version = "0.3.3"
 
 [[deps.DFTK]]
-deps = ["AbstractFFTs", "Artifacts", "AtomsBase", "AtomsCalculators", "Brillouin", "ChainRulesCore", "Dates", "DftFunctionals", "DocStringExtensions", "FFTW", "ForwardDiff", "GPUArraysCore", "Interpolations", "IterTools", "IterativeSolvers", "LazyArtifacts", "Libxc", "LineSearches", "LinearAlgebra", "LinearMaps", "MPI", "Markdown", "Optim", "PeriodicTable", "PkgVersion", "Polynomials", "PrecompileTools", "Preferences", "Primes", "Printf", "PseudoPotentialIO", "Random", "Roots", "SparseArrays", "SpecialFunctions", "Spglib", "StaticArrays", "Statistics", "TimerOutputs", "Unitful", "UnitfulAtomic"]
-git-tree-sha1 = "99b5bb711d2b4e5b7cd6d94827e6878edf51085b"
+deps = ["AbstractFFTs", "Artifacts", "AtomsBase", "AtomsCalculators", "Brillouin", "ChainRulesCore", "Dates", "DftFunctionals", "DiffResults", "DocStringExtensions", "FFTW", "ForwardDiff", "GPUArraysCore", "Interpolations", "IterTools", "IterativeSolvers", "LazyArtifacts", "Libxc", "LineSearches", "LinearAlgebra", "LinearMaps", "MPI", "Markdown", "Optim", "PeriodicTable", "PkgVersion", "Polynomials", "PrecompileTools", "Preferences", "Primes", "Printf", "PseudoPotentialIO", "Random", "Roots", "SparseArrays", "SpecialFunctions", "Spglib", "StaticArrays", "Statistics", "TimerOutputs", "Unitful", "UnitfulAtomic"]
+git-tree-sha1 = "c355fc544e8f3550ec1a1ecb18e950285f5ca797"
 uuid = "acf6eb54-70d9-11e9-0013-234b7a5f5337"
-version = "0.6.20"
+version = "0.7.3"
 
     [deps.DFTK.extensions]
     DFTKCUDAExt = "CUDA"
     DFTKGenericLinearAlgebraExt = "GenericLinearAlgebra"
+    DFTKGeometryOptimizationExt = "GeometryOptimization"
     DFTKIntervalArithmeticExt = "IntervalArithmetic"
     DFTKJLD2Ext = "JLD2"
     DFTKJSON3Ext = "JSON3"
@@ -2733,6 +2772,7 @@ version = "0.6.20"
     [deps.DFTK.weakdeps]
     CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
     GenericLinearAlgebra = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
+    GeometryOptimization = "673bf261-a53d-43b9-876f-d3c1fc8329c2"
     IntervalArithmetic = "d1acc4aa-44c8-5952-acd4-ba5d80a2a253"
     JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
     JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
@@ -2755,6 +2795,7 @@ version = "0.18.20"
 [[deps.Dates]]
 deps = ["Printf"]
 uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
+version = "1.11.0"
 
 [[deps.Dbus_jll]]
 deps = ["Artifacts", "Expat_jll", "JLLWrappers", "Libdl"]
@@ -2770,9 +2811,9 @@ version = "1.9.1"
 
 [[deps.DftFunctionals]]
 deps = ["ComponentArrays", "DiffResults", "ForwardDiff"]
-git-tree-sha1 = "0ae7d5b8d65091e4b59f5859c85be4427c57de11"
+git-tree-sha1 = "328b9fcde024c2bf17b78816914b0a153b24476a"
 uuid = "6bd331d2-b28d-4fd3-880e-1a1c7f37947f"
-version = "0.2.4"
+version = "0.3.0"
 
 [[deps.DiffResults]]
 deps = ["StaticArraysCore"]
@@ -2795,6 +2836,7 @@ version = "0.2.1"
 [[deps.Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+version = "1.11.0"
 
 [[deps.DocStringExtensions]]
 deps = ["LibGit2"]
@@ -2868,6 +2910,7 @@ version = "3.3.10+1"
 
 [[deps.FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
+version = "1.11.0"
 
 [[deps.FillArrays]]
 deps = ["LinearAlgebra"]
@@ -2938,9 +2981,9 @@ version = "2.13.3+1"
 
 [[deps.FriBidi_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "1ed150b39aebcc805c26b93a8d0122c940f64ce2"
+git-tree-sha1 = "846f7026a9decf3679419122b49f8a1fdb48d2d5"
 uuid = "559328eb-81f9-559d-9380-de523a88c83c"
-version = "1.0.14+0"
+version = "1.0.16+0"
 
 [[deps.Functors]]
 deps = ["Compat", "ConstructionBase", "LinearAlgebra", "Random"]
@@ -2951,12 +2994,13 @@ version = "0.5.2"
 [[deps.Future]]
 deps = ["Random"]
 uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
+version = "1.11.0"
 
 [[deps.GLFW_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libglvnd_jll", "Xorg_libXcursor_jll", "Xorg_libXi_jll", "Xorg_libXinerama_jll", "Xorg_libXrandr_jll", "libdecor_jll", "xkbcommon_jll"]
-git-tree-sha1 = "532f9126ad901533af1d4f5c198867227a7bb077"
+git-tree-sha1 = "fcb0584ff34e25155876418979d4c8971243bb89"
 uuid = "0656b61e-2033-5cc2-a64a-77c0f6c09b89"
-version = "3.4.0+1"
+version = "3.4.0+2"
 
 [[deps.GPUArraysCore]]
 deps = ["Adapt"]
@@ -2990,9 +3034,9 @@ version = "0.21.0+0"
 
 [[deps.Glib_jll]]
 deps = ["Artifacts", "Gettext_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Libiconv_jll", "Libmount_jll", "PCRE2_jll", "Zlib_jll"]
-git-tree-sha1 = "48b5d4c75b2c9078ead62e345966fa51a25c05ad"
+git-tree-sha1 = "b0036b392358c80d2d2124746c2bf3d48d457938"
 uuid = "7746bdde-850d-59dc-9ae8-88ece973131d"
-version = "2.82.2+1"
+version = "2.82.4+0"
 
 [[deps.Graphite2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -3060,6 +3104,7 @@ version = "2024.2.1+0"
 [[deps.InteractiveUtils]]
 deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
+version = "1.11.0"
 
 [[deps.Interpolations]]
 deps = ["Adapt", "AxisAlgorithms", "ChainRulesCore", "LinearAlgebra", "OffsetArrays", "Random", "Ratios", "Requires", "SharedArrays", "SparseArrays", "StaticArrays", "WoodburyMatrices"]
@@ -3117,9 +3162,9 @@ version = "0.21.4"
 
 [[deps.JpegTurbo_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "25ee0be4d43d0269027024d75a24c24d6c6e590c"
+git-tree-sha1 = "ef10afc9f4b942bcd75f4c3bc9d9e8d802944c23"
 uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
-version = "3.0.4+0"
+version = "3.1.0+0"
 
 [[deps.JuliaInterpreter]]
 deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
@@ -3175,6 +3220,7 @@ version = "0.16.5"
 [[deps.LazyArtifacts]]
 deps = ["Artifacts", "Pkg"]
 uuid = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
+version = "1.11.0"
 
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
@@ -3184,16 +3230,17 @@ version = "0.6.4"
 [[deps.LibCURL_jll]]
 deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll", "Zlib_jll", "nghttp2_jll"]
 uuid = "deac9b47-8bc7-5906-a0fe-35ac56dc84c0"
-version = "8.4.0+0"
+version = "8.6.0+0"
 
 [[deps.LibGit2]]
 deps = ["Base64", "LibGit2_jll", "NetworkOptions", "Printf", "SHA"]
 uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
+version = "1.11.0"
 
 [[deps.LibGit2_jll]]
 deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll"]
 uuid = "e37daf67-58a4-590a-8e99-b0245dd2ffc5"
-version = "1.6.4+0"
+version = "1.7.2+0"
 
 [[deps.LibSSH2_jll]]
 deps = ["Artifacts", "Libdl", "MbedTLS_jll"]
@@ -3202,12 +3249,13 @@ version = "1.11.0+1"
 
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
+version = "1.11.0"
 
 [[deps.Libffi_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "0b4a5d71f3e5200a7dff793393e09dfc2d874290"
+git-tree-sha1 = "27ecae93dd25ee0909666e6835051dd684cc035e"
 uuid = "e9f186c6-92d2-5b65-8a66-fee21dc1b490"
-version = "3.2.2+1"
+version = "3.2.2+2"
 
 [[deps.Libgcrypt_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libgpg_error_jll"]
@@ -3290,6 +3338,7 @@ version = "7.3.0"
 [[deps.LinearAlgebra]]
 deps = ["Libdl", "OpenBLAS_jll", "libblastrampoline_jll"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+version = "1.11.0"
 
 [[deps.LinearMaps]]
 deps = ["LinearAlgebra"]
@@ -3321,6 +3370,7 @@ version = "0.3.29"
 
 [[deps.Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
+version = "1.11.0"
 
 [[deps.LoggingExtras]]
 deps = ["Dates", "Logging"]
@@ -3386,6 +3436,7 @@ version = "0.5.13"
 [[deps.Markdown]]
 deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
+version = "1.11.0"
 
 [[deps.MbedTLS]]
 deps = ["Dates", "MbedTLS_jll", "MozillaCACerts_jll", "NetworkOptions", "Random", "Sockets"]
@@ -3396,7 +3447,7 @@ version = "1.1.9"
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
-version = "2.28.2+1"
+version = "2.28.6+0"
 
 [[deps.Measures]]
 git-tree-sha1 = "c13304c81eec1ed3af7fc20e75fb6b26092a1102"
@@ -3417,10 +3468,11 @@ version = "1.2.0"
 
 [[deps.Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
+version = "1.11.0"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
-version = "2023.1.10"
+version = "2023.12.12"
 
 [[deps.NLSolversBase]]
 deps = ["DiffResults", "Distributed", "FiniteDiff", "ForwardDiff"]
@@ -3439,9 +3491,9 @@ uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
 
 [[deps.OffsetArrays]]
-git-tree-sha1 = "39d000d9c33706b8364817d8894fae1548f40295"
+git-tree-sha1 = "5e1897147d1ff8d98883cda2be2187dcf57d8f0c"
 uuid = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
-version = "1.14.2"
+version = "1.15.0"
 weakdeps = ["Adapt"]
 
     [deps.OffsetArrays.extensions]
@@ -3456,7 +3508,7 @@ version = "1.3.5+1"
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
-version = "0.3.23+4"
+version = "0.3.27+1"
 
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -3517,9 +3569,9 @@ version = "10.42.0+1"
 
 [[deps.Pango_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "FriBidi_jll", "Glib_jll", "HarfBuzz_jll", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "e127b609fb9ecba6f201ba7ab753d5a605d53801"
+git-tree-sha1 = "ed6834e95bd326c52d5675b4181386dfbe885afb"
 uuid = "36c8627f-9965-5494-a995-c6b170f724f3"
-version = "1.54.1+0"
+version = "1.55.5+0"
 
 [[deps.Parameters]]
 deps = ["OrderedCollections", "UnPack"]
@@ -3551,9 +3603,13 @@ uuid = "30392449-352a-5448-841d-b1acce4e97dc"
 version = "0.43.4+0"
 
 [[deps.Pkg]]
-deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
+deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "Random", "SHA", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-version = "1.10.0"
+version = "1.11.0"
+weakdeps = ["REPL"]
+
+    [deps.Pkg.extensions]
+    REPLExt = "REPL"
 
 [[deps.PkgVersion]]
 deps = ["Pkg"]
@@ -3668,10 +3724,11 @@ version = "0.5.6"
 [[deps.Printf]]
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+version = "1.11.0"
 
 [[deps.Profile]]
-deps = ["Printf"]
 uuid = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
+version = "1.11.0"
 
 [[deps.PseudoPotentialIO]]
 deps = ["EzXML", "LinearAlgebra"]
@@ -3721,12 +3778,14 @@ uuid = "be4d8f0f-7fa4-5f49-b795-2f01399ab2dd"
 version = "0.5.10"
 
 [[deps.REPL]]
-deps = ["InteractiveUtils", "Markdown", "Sockets", "Unicode"]
+deps = ["InteractiveUtils", "Markdown", "Sockets", "StyledStrings", "Unicode"]
 uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
+version = "1.11.0"
 
 [[deps.Random]]
 deps = ["SHA"]
 uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+version = "1.11.0"
 
 [[deps.Ratios]]
 deps = ["Requires"]
@@ -3805,6 +3864,7 @@ version = "1.2.1"
 
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
+version = "1.11.0"
 
 [[deps.Setfield]]
 deps = ["ConstructionBase", "Future", "MacroTools", "StaticArraysCore"]
@@ -3815,6 +3875,7 @@ version = "1.1.1"
 [[deps.SharedArrays]]
 deps = ["Distributed", "Mmap", "Random", "Serialization"]
 uuid = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
+version = "1.11.0"
 
 [[deps.Showoff]]
 deps = ["Dates", "Grisu"]
@@ -3829,6 +3890,7 @@ version = "1.2.0"
 
 [[deps.Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
+version = "1.11.0"
 
 [[deps.SortingAlgorithms]]
 deps = ["DataStructures"]
@@ -3839,7 +3901,7 @@ version = "1.2.1"
 [[deps.SparseArrays]]
 deps = ["Libdl", "LinearAlgebra", "Random", "Serialization", "SuiteSparse_jll"]
 uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
-version = "1.10.0"
+version = "1.11.0"
 
 [[deps.SpecialFunctions]]
 deps = ["IrrationalConstants", "LogExpFunctions", "OpenLibm_jll", "OpenSpecFun_jll"]
@@ -3897,9 +3959,14 @@ uuid = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
 version = "1.4.3"
 
 [[deps.Statistics]]
-deps = ["LinearAlgebra", "SparseArrays"]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "ae3bb1eb3bba077cd276bc5cfc337cc65c3075c0"
 uuid = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
-version = "1.10.0"
+version = "1.11.1"
+weakdeps = ["SparseArrays"]
+
+    [deps.Statistics.extensions]
+    SparseArraysExt = ["SparseArrays"]
 
 [[deps.StatsAPI]]
 deps = ["LinearAlgebra"]
@@ -3919,10 +3986,14 @@ git-tree-sha1 = "192a9f1de3cfef80ab1a4ba7b150bb0e11ceedcf"
 uuid = "6ec83bb0-ed9f-11e9-3b4c-2b04cb4e219c"
 version = "2.1.0"
 
+[[deps.StyledStrings]]
+uuid = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
+version = "1.11.0"
+
 [[deps.SuiteSparse_jll]]
 deps = ["Artifacts", "Libdl", "libblastrampoline_jll"]
 uuid = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
-version = "7.2.1+1"
+version = "7.7.0+0"
 
 [[deps.TOML]]
 deps = ["Dates"]
@@ -3943,6 +4014,7 @@ version = "0.1.1"
 [[deps.Test]]
 deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+version = "1.11.0"
 
 [[deps.TimerOutputs]]
 deps = ["ExprTools", "Printf"]
@@ -3968,6 +4040,7 @@ version = "1.5.1"
 [[deps.UUIDs]]
 deps = ["Random", "SHA"]
 uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
+version = "1.11.0"
 
 [[deps.UnPack]]
 git-tree-sha1 = "387c1f73762231e86e0c9c5443ce3b4a0a9a0c2b"
@@ -3976,6 +4049,7 @@ version = "1.0.2"
 
 [[deps.Unicode]]
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
+version = "1.11.0"
 
 [[deps.UnicodeFun]]
 deps = ["REPL"]
@@ -4019,9 +4093,9 @@ version = "1.3.243+0"
 
 [[deps.Wayland_jll]]
 deps = ["Artifacts", "EpollShim_jll", "Expat_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg", "XML2_jll"]
-git-tree-sha1 = "7558e29847e99bc3f04d6569e82d0f5c54460703"
+git-tree-sha1 = "85c7811eddec9e7f22615371c3cc81a504c508ee"
 uuid = "a2964d1f-97da-50d4-b82a-358c7fce9d89"
-version = "1.21.0+1"
+version = "1.21.0+2"
 
 [[deps.Wayland_protocols_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -4078,10 +4152,10 @@ uuid = "0c0b7dd1-d40b-584c-a123-a41640f87eec"
 version = "1.0.11+1"
 
 [[deps.Xorg_libXcursor_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_libXfixes_jll", "Xorg_libXrender_jll"]
-git-tree-sha1 = "12e0eb3bc634fa2080c1c37fccf56f7c22989afd"
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXfixes_jll", "Xorg_libXrender_jll"]
+git-tree-sha1 = "807c226eaf3651e7b2c468f687ac788291f9a89b"
 uuid = "935fb764-8cf2-53bf-bb30-45bb1f8bf724"
-version = "1.2.0+4"
+version = "1.2.3+0"
 
 [[deps.Xorg_libXdmcp_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -4096,16 +4170,16 @@ uuid = "1082639a-0dae-5f34-9b06-72781eeb8cb3"
 version = "1.3.6+1"
 
 [[deps.Xorg_libXfixes_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_libX11_jll"]
-git-tree-sha1 = "0e0dc7431e7a0587559f9294aeec269471c991a4"
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll"]
+git-tree-sha1 = "6fcc21d5aea1a0b7cce6cab3e62246abd1949b86"
 uuid = "d091e8ba-531a-589c-9de9-94069b037ed8"
-version = "5.0.3+4"
+version = "6.0.0+0"
 
 [[deps.Xorg_libXi_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_libXext_jll", "Xorg_libXfixes_jll"]
-git-tree-sha1 = "89b52bc2160aadc84d707093930ef0bffa641246"
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXext_jll", "Xorg_libXfixes_jll"]
+git-tree-sha1 = "984b313b049c89739075b8e2a94407076de17449"
 uuid = "a51aa0fd-4e3c-5386-b890-e753decda492"
-version = "1.7.10+4"
+version = "1.8.2+0"
 
 [[deps.Xorg_libXinerama_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXext_jll"]
@@ -4288,7 +4362,7 @@ version = "1.1.6+0"
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
-version = "1.52.0+1"
+version = "1.59.0+0"
 
 [[deps.oneTBB_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -4321,9 +4395,9 @@ version = "3.5.0+0"
 
 [[deps.xkbcommon_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Wayland_jll", "Wayland_protocols_jll", "Xorg_libxcb_jll", "Xorg_xkeyboard_config_jll"]
-git-tree-sha1 = "9c304562909ab2bab0262639bd4f444d7bc2be37"
+git-tree-sha1 = "63406453ed9b33a0df95d570816d5366c92b7809"
 uuid = "d8fb68d0-12a3-5cfd-a85a-d49703b185fd"
-version = "1.4.1+1"
+version = "1.4.1+2"
 """
 
 # ╔═╡ Cell order:
@@ -4331,7 +4405,6 @@ version = "1.4.1+1"
 # ╟─35066ab2-d52d-4a7f-9170-abbae6216996
 # ╠═a9548adc-cc71-4f26-96d2-7aefc39a554f
 # ╟─f09f563c-e458-480f-92be-355ab4582fb5
-# ╠═3de7dfe4-032b-4e05-a929-5ffabfbb35cc
 # ╟─c17073d6-94e2-464f-acff-6f444bf7d08c
 # ╟─a4f9260b-7016-4a12-8fd1-230b8e234496
 # ╟─1bfb62aa-4b01-4839-8073-2a196162cd17
@@ -4499,6 +4572,7 @@ version = "1.4.1+1"
 # ╟─d4792fec-7762-4c2b-9be8-3c6c6791bd3d
 # ╠═10426573-4929-4576-9633-781b024bd97b
 # ╠═e18db268-8e9e-49e3-ae7a-d15319eb9740
+# ╟─56a0ead4-72fc-4ce5-935c-cea39892a921
 # ╟─3de33cb8-c6ee-4b60-94df-2cf29afbe2d7
 # ╟─2c6f639e-fbf2-4d9a-a0dd-4306f0b92a8d
 # ╠═f0b9d21b-dc78-4d95-ac47-5a19f41c0fd4
@@ -4511,9 +4585,10 @@ version = "1.4.1+1"
 # ╟─9430a871-0f8f-4ee2-b574-f818f1580abd
 # ╟─3c1c0131-96fe-4fb7-ac0c-0aaec21dd023
 # ╟─5de67497-d252-443a-8a72-8e01891aea41
-# ╠═0d535f1b-e01a-4d6e-9800-058ae20b4d0a
 # ╠═8c712ee5-f076-442e-ad33-edfe5a6e6941
 # ╠═1d1b7bd7-6673-431e-8802-29cd257d0e69
+# ╠═bee97b01-7205-4b2c-8ab2-8af285f8b8f9
+# ╟─87ae5e00-2bb7-433f-8f77-1097fe37b347
 # ╟─ee3fe129-48f8-4932-ac23-2287c6be9780
 # ╟─b61a9e8c-e7b4-4e5e-8b4a-10e939c164a9
 # ╟─ea9b6c1b-e2dd-4c68-82ca-b63ada51cfd1
