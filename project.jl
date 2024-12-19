@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.46
+# v0.20.3
 
 using Markdown
 using InteractiveUtils
@@ -1472,7 +1472,7 @@ md"""
 """
 
 # ╔═╡ b1270539-8079-4761-ab61-55d08d563635
-# Function to compute the norm2 of each column of residual matrices, this will use for Baure-Fike bound
+# Function to compute the norm2 of each column of residual matrices, this will use for Bauer-Fike bound
 function compute_column_norms(residuals)
     column_norms = []  # Array to store norms for all k-points and columns
 
@@ -1645,7 +1645,7 @@ plot_bandstructure(band_data)
 md"Error bars for indicating eigenvalue errors can also be easily added:"
 
 # ╔═╡ 2dee9a6b-c5dd-4511-a9e3-1d5bc33db946
-begin
+let
 	eigenvalues_error = [0.02 * abs.(randn(size(λk)))
 		                 for λk in band_data.eigenvalues]  # dummy data
 	data_with_errors = merge(band_data, (; eigenvalues_error))
@@ -1677,8 +1677,33 @@ md"""
 -------
 """
 
-# ╔═╡ 1957a8bb-b426-49c3-be25-2ad418d292ad
-# Your answer here
+# ╔═╡ f3d70415-29ee-41ad-b57a-38a074a5aaf8
+##### WE HAVE TO CHANGE THE WAY E8CUT IS COMPUTED #####
+
+let n_bands=6, Ecut=7, Ecut_v=15, Ecut_large=Ecut+Ecut_v
+	#computing the band structure
+	basis_small = PlaneWaveBasis(model; Ecut=Ecut, kgrid=(1, 1, 1))
+	band_data = compute_bands(basis_small, kpath; kline_density=15, tol=1e-3, n_bands=n_bands)
+
+	#defining a large basis for the computation of the Bauer-Fike estimate
+	basis_large = PlaneWaveBasis(model; Ecut=Ecut_large, band_data.basis.kgrid)
+	ham_large = Hamiltonian(basis_large)
+
+	
+	eigenvalues_error = [zeros(size(λk)) for λk in band_data.eigenvalues]
+	for (ik, λk) in enumerate(band_data.eigenvalues)
+		#transfering the blochwave to the large basis
+		ψ_large_temp = transfer_blochwave_kpt(band_data.ψ[ik], band_data.basis, band_data.basis.kpoints[ik], basis_large, basis_large.kpoints[ik])
+		#computing the residuals
+		res_k_temp = ham_large[ik] * ψ_large_temp - ψ_large_temp * Diagonal(band_data.eigenvalues[ik])
+		#getting the morn of the residuals (bauer-Fike estimates)
+		eigenvalues_error[ik] = norm.(eachcol(res_k_temp))
+	end
+
+	data_with_errors = merge(band_data, (; eigenvalues_error))
+	plot_bandstructure(data_with_errors)
+	title!("band structure with Bauer-Fike error estimate")
+end
 
 # ╔═╡ d7f3cadf-6161-41ce-8a7a-20fba5182cfb
 md"""
@@ -1721,8 +1746,54 @@ md"""
 **(c)** Perform a band structure computation at cutoff $\mathcal{E} = 7$ annotated with the error estimated using the estimate developed in *(b)*. For approximate eigenvalues where you cannot obtain a Kato-Temple estimate (e.g. degeneracies), fall back to a Bauer-Fike estimate. Play with the cutoff. What do you observe ? Do the error bars correspond to the expectations of a variational convergence ? Apart from the probably unjustified assumption in *(b)*, what is the biggest drawback of the Kato-Temple estimate ?
 """
 
+# ╔═╡ d324c779-6999-4953-8408-c4bf6e9551c1
+md"""
+The Kato-Temple is only available when the eigenvalues are non-degenerated. It can also happen that the garanteed gap (computed thanks to the Bauer-Fike estimate) is less than zero (even though the eigenvalues are non-degenerated), making the Kato-Temple bound unavailable. In both case, the error bound defaults to the Bauer-Fike error bound. 
+"""
+
 # ╔═╡ 63b1a886-6b63-4219-a941-f1a699f0d614
-# Your answer here
+let n_bands=6, Ecut=7, Ecut_v=15, Ecut_large=Ecut+Ecut_v
+	#computing the band structure
+	basis_small = PlaneWaveBasis(model; Ecut=Ecut, kgrid=(1, 1, 1))
+	band_data = compute_bands(basis_small, kpath; kline_density=15, tol=1e-3, n_bands=n_bands)
+
+	#defining a large basis for the computation of the Bauer-Fike estimate
+	basis_large = PlaneWaveBasis(model; Ecut=Ecut_large, band_data.basis.kgrid)
+	ham_large = Hamiltonian(basis_large)
+
+	
+	eigenvalues_error_BF = [zeros(size(λk)) for λk in band_data.eigenvalues]
+	eigenvalues_error_KT = [zeros(size(λk)) for λk in band_data.eigenvalues]
+	
+	for (ik, λk) in enumerate(band_data.eigenvalues)
+		#transfering the blochwave to the large basis
+		ψ_large_temp = transfer_blochwave_kpt(band_data.ψ[ik], band_data.basis, band_data.basis.kpoints[ik], basis_large, basis_large.kpoints[ik])
+		#computing the residuals
+		res_k_temp = ham_large[ik] * ψ_large_temp - ψ_large_temp * Diagonal(band_data.eigenvalues[ik])
+		#getting the norm of the residuals (Bauer-Fike estimates)
+		eigenvalues_error_BF[ik] = norm.(eachcol(res_k_temp))
+		
+		#defining the gap
+		gap_temp = zeros(n_bands)
+		gap_temp[1] = λk[2] - λk[1] - eigenvalues_error_BF[ik][2]
+		for jn in 2:1:n_bands-1
+			gap_temp[jn] = min(λk[jn]-λk[jn-1]-eigenvalues_error_BF[ik][jn-1], λk[jn+1]-λk[jn]-eigenvalues_error_BF[ik][jn+1])
+		end
+		gap_temp[n_bands] = λk[n_bands] - λk[n_bands-1] - eigenvalues_error_BF[ik][n_bands-1]
+		#getting the Kato-Temple estimate (if it exists)
+		for jn in 1:1:n_bands
+			if gap_temp[jn] > 0.0
+				eigenvalues_error_KT[ik][jn] = eigenvalues_error_BF[ik][jn] * eigenvalues_error_BF[ik][jn] / gap_temp[jn]
+			else
+				eigenvalues_error_KT[ik][jn] = 100.0
+			end
+		end
+	end
+	eigenvalues_error = [min.(eigenvalues_error_BF[ik], eigenvalues_error_KT[ik]) for ik in 1:1:size(eigenvalues_error_BF,1)]
+	data_with_errors = merge(band_data, (; eigenvalues_error))
+	plot_bandstructure(data_with_errors)
+	title!("band structure with Kato-Temple error estimates*")
+end
 
 # ╔═╡ 5f5f139e-57f9-4b2f-8398-a13fbe119fb5
 md"""
@@ -4461,13 +4532,14 @@ version = "1.4.1+1"
 # ╟─da8c23eb-d473-4c2f-86f9-879016659f3e
 # ╠═3006a991-d017-40b3-b52b-31438c05d088
 # ╟─646242a2-8df6-4caf-81dc-933345490e6c
-# ╠═1957a8bb-b426-49c3-be25-2ad418d292ad
+# ╠═f3d70415-29ee-41ad-b57a-38a074a5aaf8
 # ╟─d7f3cadf-6161-41ce-8a7a-20fba5182cfb
 # ╟─5f0d20d1-c5f0-43b8-b65d-d5a2039cd01a
 # ╠═4cc3ded3-9c62-4af5-be73-7f52fa6ed177
 # ╟─a1c02b0d-da66-4b1a-9a4b-2a5dd7997232
 # ╠═bfdc1d7f-1899-449d-ac10-6e8b83302823
 # ╟─7ed09f35-a22b-47c0-9ada-e3c11a9645a8
+# ╠═d324c779-6999-4953-8408-c4bf6e9551c1
 # ╠═63b1a886-6b63-4219-a941-f1a699f0d614
 # ╟─5f5f139e-57f9-4b2f-8398-a13fbe119fb5
 # ╟─14df1c0f-1c4f-4da9-be49-3941b9c12fd3
