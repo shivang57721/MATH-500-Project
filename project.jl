@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.0
+# v0.19.46
 
 using Markdown
 using InteractiveUtils
@@ -1236,13 +1236,13 @@ ref_eign = calculate_eigenvalues(model, 80)[1]
 
 # ╔═╡ 20c15f08-8bf9-4c6b-84ab-4486ba0a9237
 # Loop over Ecut values and calculate eigenvalues
-for (i, Ecut) in enumerate(Ecut_values)
-    eigenvalues[i, :] = calculate_eigenvalues(model, Ecut)[1]
-	eigen_diff[i, :] = eigenvalues[i, :] .- ref_eign
+begin
+	for (i, Ecut) in enumerate(Ecut_values)
+	    eigenvalues[i, :] = calculate_eigenvalues(model, Ecut)[1]
+		eigen_diff[i, :] = eigenvalues[i, :] .- ref_eign
+	end
+	eigen_diff_abs = abs.(eigen_diff)
 end
-
-# ╔═╡ 0b341e85-e4e1-4887-982e-c7de6bef55a8
-eigen_diff_abs = abs.(eigen_diff)
 
 # ╔═╡ e0c6e8d3-4f0a-4be6-805f-79fb012c01d8
 begin
@@ -4613,7 +4613,6 @@ version = "1.4.1+2"
 # ╠═8730b929-31a1-40ed-afa3-35d539a364aa
 # ╠═9115099c-9af4-42fd-b688-70d0858dbeff
 # ╠═20c15f08-8bf9-4c6b-84ab-4486ba0a9237
-# ╠═0b341e85-e4e1-4887-982e-c7de6bef55a8
 # ╠═e0c6e8d3-4f0a-4be6-805f-79fb012c01d8
 # ╟─ba1ba08f-7fe5-4fb3-b736-adaf7200af08
 # ╟─58856ccd-3a1c-4a5f-9bd2-159be331f07c
